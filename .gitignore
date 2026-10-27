@@ -1,6 +1,7 @@
 # Environment & Secrets (Never commit API keys!)
 .env
 .env*.local
+providers.json
 
 # Python
 __pycache__/

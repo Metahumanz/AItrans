@@ -1,6 +1,5 @@
-# transoptdeepseek.py - 使用 DeepSeek-V4-Flash API 翻译并润色 SRT 字幕
+# transoptdeepseek.py - 使用 OpenAI 兼容 API 翻译并润色 SRT 字幕
 import argparse
-import os
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -8,9 +7,12 @@ from datetime import datetime
 
 from tqdm import tqdm
 
-from transdeepseek import (
+from provider_config import (
     DEFAULT_BASE_URL,
     DEFAULT_MODEL,
+    resolve_runtime_config,
+)
+from transdeepseek import (
     DEFAULT_TRANSLATE_WORKERS,
     ORI_DIR,
     OUTPUT_DIR,
@@ -325,8 +327,10 @@ def process_ori_folder(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="使用 DeepSeek API 批量翻译并润色 SRT 字幕")
-    parser.add_argument("--model", default=DEFAULT_MODEL, help="DeepSeek 模型名称")
+    runtime = resolve_runtime_config()
+
+    parser = argparse.ArgumentParser(description="使用 OpenAI 兼容 API 批量翻译并润色 SRT 字幕")
+    parser.add_argument("--model", default=runtime["model"] or DEFAULT_MODEL, help="模型名称（默认读取 .env）")
     parser.add_argument(
         "--lang",
         default="zh",
@@ -358,7 +362,9 @@ def main():
         parser.error("--optimize-workers 必须大于 0")
 
     print(f"{'=' * 60}")
-    print("DeepSeek API 字幕翻译 + 润色")
+    print("API 字幕翻译 + 润色")
+    print(f"模型提供商: {runtime['provider_name']} ({runtime['provider_id']})")
+    print(f"接口地址: {runtime['base_url']}")
     print(f"使用模型: {args.model}")
     print(f"目标语言: {args.lang}")
     print(f"润色批次: {args.batch_size} 段")
@@ -373,7 +379,7 @@ def main():
     start_time = datetime.now()
     try:
         api_key = get_api_key()
-        base_url = os.environ.get("DEEPSEEK_BASE_URL", DEFAULT_BASE_URL).strip()
+        base_url = runtime["base_url"] or DEFAULT_BASE_URL
         processed_count, skipped_count = process_ori_folder(
             api_key,
             base_url,

@@ -1,4 +1,4 @@
-# transdeepseek.py - 使用 DeepSeek-Flash API 批量翻译 SRT 字幕
+# transdeepseek.py - 使用 OpenAI 兼容 API 批量翻译 SRT 字幕
 import argparse
 import json
 import os
@@ -10,48 +10,45 @@ from datetime import datetime
 from http.client import HTTPException
 from pathlib import Path
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from tqdm import tqdm
 
+from provider_config import (
+    DEFAULT_BASE_URL,
+    DEFAULT_MODEL,
+    ENV_PATH,  # noqa: F401 - 兼容旧的模块级常量
+    get_api_key as get_provider_api_key,
+    load_env_file,  # noqa: F401 - 保留旧的导入接口
+    resolve_runtime_config,
+)
+
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-ENV_PATH = SCRIPT_DIR / ".env"
 ORI_DIR = SCRIPT_DIR / "ori"
 OUTPUT_DIR = SCRIPT_DIR / "output"
-DEFAULT_MODEL = "deepseek-flash"
-DEFAULT_BASE_URL = "https://api.deepseek.com"
 DEFAULT_TRANSLATE_WORKERS = 50
 
 
-def load_env_file(path=ENV_PATH):
-    """读取简单的 .env 文件，不额外依赖 python-dotenv。"""
-    if not path.exists():
-        return
-
-    values = {}
-    for raw_line in path.read_text(encoding="utf-8-sig").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-            value = value[1:-1]
-        if key:
-            values[key] = value
-
-    for key, value in values.items():
-        os.environ.setdefault(key, value)
-
-
 def get_api_key():
-    load_env_file()
-    api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
-    if not api_key:
-        raise RuntimeError("未找到 DEEPSEEK_API_KEY。请先运行对应的 .bat（Windows）或 .command（macOS）文件并按提示输入 API Key。")
-    return api_key
+    """返回当前提供商的 API Key（保留旧函数名以兼容启动脚本）。"""
+    return get_provider_api_key()
+
+
+def should_disable_thinking(base_url):
+    """DeepSeek V4 默认开启思考模式；字幕任务关闭它可降低延迟。
+
+    其他 OpenAI 兼容服务通常不认识 thinking 字段，因此默认不发送。
+    可用 AI_THINKING=on/off 强制覆盖。
+    """
+    override = os.environ.get("AI_THINKING", "").strip().lower()
+    if override in {"off", "0", "false", "disabled"}:
+        return False
+    if override in {"on", "1", "true", "enabled"}:
+        return True
+    host = (urlparse(base_url).hostname or "").lower()
+    return "deepseek" in host
 
 
 def get_error_message(error):
@@ -75,20 +72,21 @@ def report_retry(attempt, retries, delay, message):
 
 
 def request_chat_completion(api_key, base_url, model_name, messages, timeout, retries):
-    """调用 DeepSeek OpenAI 兼容接口。"""
+    """调用当前提供商的 OpenAI 兼容接口。"""
     payload = {
         "model": model_name,
         "messages": messages,
-        # V4 默认开启思考模式。字幕翻译和润色关闭思考可降低延迟和消耗。
-        "thinking": {"type": "disabled"},
     }
+    if should_disable_thinking(base_url):
+        # V4 默认开启思考模式。字幕翻译和润色关闭思考可降低延迟和消耗。
+        payload["thinking"] = {"type": "disabled"}
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     request = Request(
         f"{base_url.rstrip('/')}/chat/completions",
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
+        headers=headers,
         method="POST",
     )
 
@@ -124,7 +122,7 @@ def request_chat_completion(api_key, base_url, model_name, messages, timeout, re
 
 
 def request_translation(api_key, base_url, model_name, original_text, lang_display, timeout, retries):
-    """调用 DeepSeek 翻译一条字幕。"""
+    """调用当前提供商翻译一条字幕。"""
     translated_text = request_chat_completion(
         api_key,
         base_url,
@@ -271,8 +269,10 @@ def process_ori_folder(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="使用 DeepSeek API 批量翻译 SRT 字幕文件")
-    parser.add_argument("--model", default=DEFAULT_MODEL, help="DeepSeek 模型名称")
+    runtime = resolve_runtime_config()
+
+    parser = argparse.ArgumentParser(description="使用 OpenAI 兼容 API 批量翻译 SRT 字幕文件")
+    parser.add_argument("--model", default=runtime["model"] or DEFAULT_MODEL, help="模型名称（默认读取 .env）")
     parser.add_argument(
         "--lang",
         default="zh",
@@ -288,7 +288,9 @@ def main():
         parser.error("--workers 必须大于 0")
 
     print(f"{'=' * 60}")
-    print("DeepSeek API 批量翻译字幕")
+    print("API 批量翻译字幕")
+    print(f"模型提供商: {runtime['provider_name']} ({runtime['provider_id']})")
+    print(f"接口地址: {runtime['base_url']}")
     print(f"使用模型: {args.model}")
     print(f"目标语言: {args.lang}")
     print(f"翻译并发: {args.workers}")
@@ -301,7 +303,7 @@ def main():
     start_time = datetime.now()
     try:
         api_key = get_api_key()
-        base_url = os.environ.get("DEEPSEEK_BASE_URL", DEFAULT_BASE_URL).strip()
+        base_url = runtime["base_url"] or DEFAULT_BASE_URL
         processed_count, skipped_count = process_ori_folder(
             api_key, base_url, args.model, args.lang, args.timeout, args.retries, args.workers, args.force
         )

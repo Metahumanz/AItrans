@@ -30,9 +30,16 @@ mode="${1:-}"
 case "$mode" in
     trans|transopt) dependencies=(ollama tqdm); backend=ollama ;;
     transdeepseek|transoptdeepseek) dependencies=(tqdm); backend=deepseek ;;
+    provider) dependencies=(); backend=provider ;;
     *) echo "错误：未知的启动模式。"; exit 1 ;;
 esac
 shift
+
+if [ "$mode" = "provider" ]; then
+    script="provider_gui.py"
+else
+    script="$mode.py"
+fi
 
 # Finder's PATH often does not include Homebrew. Keep dependencies local.
 python=".venv/bin/python"
@@ -60,9 +67,16 @@ fi
 # Help must work without an API key or a running Ollama service.
 for argument in "$@"; do
     case "$argument" in
-        -h|--help) "$python" -B "$mode.py" "$@"; exit $? ;;
+        -h|--help) "$python" -B "$script" "$@"; exit $? ;;
     esac
 done
+
+# The provider GUI is self-contained; it only needs the local Python.
+if [ "$mode" = "provider" ]; then
+    "$python" -B "$script" "$@"
+    exit $?
+fi
+
 mkdir -p ori output
 
 if [ "$backend" = "deepseek" ]; then
@@ -70,32 +84,27 @@ if [ "$backend" = "deepseek" ]; then
     if [[ ! ${DEEPSEEK_API_KEY:-} =~ [^[:space:]] ]]; then
         unset DEEPSEEK_API_KEY
     fi
+    if [[ ! ${AI_API_KEY:-} =~ [^[:space:]] ]]; then
+        unset AI_API_KEY
+    fi
     # Keep stdin attached to Terminal so getpass can also use it as a fallback.
     key_setup_code=$(cat <<'PY'
 import getpass
-import os
 import sys
-from pathlib import Path
-from transdeepseek import get_api_key
+
+from provider_config import get_api_key, resolve_runtime_config, set_active_api_key
 
 try:
     get_api_key()
 except RuntimeError:
-    if not sys.stdin.isatty() and not os.isatty(2):
-        raise SystemExit("未配置 DeepSeek Key。请双击 .command 输入，或设置 DEEPSEEK_API_KEY。")
-    print("首次运行：请输入 DeepSeek API Key，将保存到本目录的 .env。")
+    if not sys.stdin.isatty() and not sys.stderr.isatty():
+        raise SystemExit("未配置 API Key。请双击 provider.command 配置，或设置 AI_API_KEY。")
+    config = resolve_runtime_config()
+    print(f"首次运行：请输入「{config['provider_name']}」的 API Key，将保存到本目录的 .env。")
     key = getpass.getpass("API Key（输入不显示）: ").strip()
     if not key:
         raise SystemExit("API Key 不能为空。")
-    path = Path(".env")
-    old = path.read_text(encoding="utf-8-sig") if path.exists() else ""
-    lines = [line for line in old.splitlines()
-             if line.partition("=")[0].strip() != "DEEPSEEK_API_KEY"]
-    lines.append("DEEPSEEK_API_KEY=" + key)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as file:
-        os.fchmod(file.fileno(), 0o600)
-        file.write("\n".join(lines) + "\n")
+    set_active_api_key(key)
     print("API Key 已保存。")
 PY
     )
@@ -143,5 +152,5 @@ PY
 fi
 
 printf '\n开始处理 ori 文件夹中的 .srt 字幕…\n\n'
-"$python" -B "$mode.py" "$@"
+"$python" -B "$script" "$@"
 printf '\n脚本运行结束，结果请查看 output 文件夹；翻译失败数量请查看上方摘要。\n'
