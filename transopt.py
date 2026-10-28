@@ -5,8 +5,12 @@ import re
 import time
 from datetime import datetime
 
+from pathlib import Path
+
 import ollama
 from tqdm import tqdm
+
+from translation_paths import collect_srt_files, prepare_outputs
 
 
 def translate_file(srt_path, model_name, lang="zh"):
@@ -216,49 +220,56 @@ def assemble_srt(parsed_blocks):
     return "\n\n".join(result)
 
 
-def process_folder(model_name, lang="zh", force=False):
-    """处理 ori 文件夹中的所有 SRT 文件：先翻译再润色。"""
-    os.makedirs("output", exist_ok=True)
-    if not os.path.exists("ori"):
-        raise RuntimeError("源文件夹不存在: ori")
-    srt_files = [
-        filename
-        for filename in os.listdir("ori")
-        if filename.endswith(".srt") and os.path.isfile(os.path.join("ori", filename))
-    ]
-    srt_files.sort(key=lambda filename: os.path.getmtime(os.path.join("ori", filename)))
+def process_folder(
+    model_name,
+    lang="zh",
+    force=False,
+    inputs=None,
+    output_dir=None,
+    save_to_source=False,
+    suffix="_translated",
+):
+    """处理指定文件/文件夹中的所有 SRT 文件：先翻译再润色。"""
+    source_files = collect_srt_files(inputs, "ori")
+    output_root = Path(output_dir) if output_dir else Path("output")
+    if not save_to_source:
+        output_root.mkdir(parents=True, exist_ok=True)
+    pairs = prepare_outputs(
+        source_files,
+        output_dir=output_root,
+        save_to_source=save_to_source,
+        suffix=suffix,
+    )
 
     skipped_files = []
     to_process = []
-    for filename in srt_files:
-        output_path = os.path.join("output", filename)
-        if not force and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-            skipped_files.append((filename, output_path))
+    for source, output_path in pairs:
+        if not force and output_path.exists() and output_path.stat().st_size > 0:
+            skipped_files.append((source, output_path))
         else:
-            to_process.append(filename)
+            to_process.append((source, output_path))
 
-    print(f"找到 {len(srt_files)} 个 SRT 文件 (待处理: {len(to_process)}, 已跳过: {len(skipped_files)})\n")
-    for filename, output_path in skipped_files:
-        print(f"[跳过] {filename} (输出文件已存在: {output_path}, 大小: {os.path.getsize(output_path) / 1024:.1f} KB)")
+    print(f"找到 {len(source_files)} 个 SRT 文件 (待处理: {len(to_process)}, 已跳过: {len(skipped_files)})\n")
+    for source, output_path in skipped_files:
+        print(f"[跳过] {source.name} (输出文件已存在: {output_path}, 大小: {output_path.stat().st_size / 1024:.1f} KB)")
 
-    if not to_process and len(srt_files) > 0:
-        print("\n所有字幕文件在 output 中均已存在翻译与润色结果，无需重复处理。")
-        print("如需重新处理，请删除 output 目录中对应的文件，或添加 --force 参数重新运行。")
+    if not to_process and len(source_files) > 0:
+        print("\n所有字幕文件均已存在翻译与润色结果，无需重复处理。")
+        print("如需重新处理，请删除对应的输出文件，或添加 --force 参数重新运行。")
         return 0, len(skipped_files)
 
     processed = 0
-    for filename in to_process:
+    for source, output_path in to_process:
         file_start = datetime.now()
-        file_path = os.path.join("ori", filename)
-        output_path = os.path.join("output", filename)
 
         print(f"{'=' * 60}")
-        print(f"处理文件: {filename} ({os.path.getsize(file_path) / 1024:.1f} KB)")
+        print(f"处理文件: {source.name} ({source.stat().st_size / 1024:.1f} KB)")
+        print(f"输出到: {output_path}")
         print(f"{'=' * 60}")
-        parsed = translate_file(file_path, model_name, lang)
+        parsed = translate_file(source, model_name, lang)
         parsed = optimize_translations(parsed, model_name)
-        with open(output_path, "w", encoding="utf-8") as file:
-            file.write(assemble_srt(parsed))
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(assemble_srt(parsed), encoding="utf-8")
 
         print(f"  文件完成! 总耗时: {(datetime.now() - file_start).total_seconds():.1f}秒\n")
         processed += 1
@@ -275,20 +286,46 @@ def main():
         choices=["zh", "en", "ja", "ko"],
         help="翻译目标语言",
     )
-    parser.add_argument("--force", "-f", action="store_true", help="强制重新翻译与润色，即使 output 目录已存在同名结果")
+    parser.add_argument("--force", "-f", action="store_true", help="强制重新翻译与润色，即使输出文件已存在")
+    parser.add_argument(
+        "--input",
+        action="append",
+        metavar="PATH",
+        help="SRT 文件或文件夹，可重复指定；默认 ori 文件夹",
+    )
+    parser.add_argument("--output-dir", metavar="DIR", help="输出文件夹（默认 output）")
+    parser.add_argument(
+        "--save-to-source",
+        action="store_true",
+        help="保存到每个源文件所在目录，文件名加后缀，不覆盖原文件",
+    )
+    parser.add_argument("--suffix", default="_translated", help="配合 --save-to-source 使用的文件名后缀（默认 _translated）")
     args = parser.parse_args()
 
+    source_display = ", ".join(args.input) if args.input else "ori"
+    output_display = (
+        f"源文件目录（后缀 {args.suffix}）" if args.save_to_source else (args.output_dir or "output")
+    )
     print(f"{'=' * 60}")
     print("字幕翻译+润色一体化工具")
     print(f"模型: {args.model}  目标语言: {args.lang}")
     print(f"强制重译: {'是' if args.force else '否 (已存在结果自动跳过)'}")
-    print("ori/ → 翻译 → 润色 → output/")
+    print(f"源文件: {source_display}")
+    print(f"输出位置: {output_display}")
     print(f"{'=' * 60}\n")
 
     start_time = datetime.now()
     skipped_count = 0
     try:
-        count, skipped_count = process_folder(args.model, args.lang, args.force)
+        count, skipped_count = process_folder(
+            args.model,
+            args.lang,
+            args.force,
+            inputs=args.input,
+            output_dir=args.output_dir,
+            save_to_source=args.save_to_source,
+            suffix=args.suffix,
+        )
     except Exception as error:
         print(f"\n发生错误: {error}")
         count = 0

@@ -15,6 +15,7 @@ from urllib.request import Request, urlopen
 
 from tqdm import tqdm
 
+from translation_paths import collect_srt_files, prepare_outputs
 from provider_config import (
     DEFAULT_BASE_URL,
     DEFAULT_MODEL,
@@ -222,46 +223,61 @@ def translate_srt_file(
 
 
 def process_ori_folder(
-    api_key, base_url, model_name, lang, timeout, retries, workers, force=False
+    api_key,
+    base_url,
+    model_name,
+    lang,
+    timeout,
+    retries,
+    workers,
+    force=False,
+    inputs=None,
+    output_dir=None,
+    save_to_source=False,
+    suffix="_translated",
 ):
-    """处理 ori 文件夹中的所有 SRT 文件。"""
-    OUTPUT_DIR.mkdir(exist_ok=True)
-    if not ORI_DIR.exists():
-        raise RuntimeError(f"源文件夹不存在: {ORI_DIR}")
-    srt_files = [path for path in ORI_DIR.iterdir() if path.is_file() and path.suffix.lower() == ".srt"]
-    srt_files.sort(key=lambda path: path.stat().st_mtime)
+    """处理指定文件/文件夹中的所有 SRT 文件（默认 ori 文件夹）。"""
+    source_files = collect_srt_files(inputs, ORI_DIR)
+    output_root = Path(output_dir) if output_dir else OUTPUT_DIR
+    if not save_to_source:
+        output_root.mkdir(parents=True, exist_ok=True)
+    pairs = prepare_outputs(
+        source_files,
+        output_dir=output_root,
+        save_to_source=save_to_source,
+        suffix=suffix,
+    )
 
     skipped_files = []
     to_process = []
-    for srt_path in srt_files:
-        output_path = OUTPUT_DIR / srt_path.name
+    for source, output_path in pairs:
         if not force and output_path.exists() and output_path.stat().st_size > 0:
-            skipped_files.append((srt_path, output_path))
+            skipped_files.append((source, output_path))
         else:
-            to_process.append(srt_path)
+            to_process.append((source, output_path))
 
-    print(f"找到 {len(srt_files)} 个 SRT 文件 (待处理: {len(to_process)}, 已跳过: {len(skipped_files)})，按修改时间升序处理...")
-    for srt_path, output_path in skipped_files:
-        print(f"[跳过] {srt_path.name} (输出文件已存在: {output_path.name}, 大小: {output_path.stat().st_size / 1024:.1f} KB)")
+    print(f"找到 {len(source_files)} 个 SRT 文件 (待处理: {len(to_process)}, 已跳过: {len(skipped_files)})，按修改时间升序处理...")
+    for source, output_path in skipped_files:
+        print(f"[跳过] {source.name} (输出文件已存在: {output_path}, 大小: {output_path.stat().st_size / 1024:.1f} KB)")
 
-    if not to_process and len(srt_files) > 0:
-        print("\n所有字幕文件在 output 中均已存在翻译结果，无需重复翻译。")
-        print("如需重新翻译，请删除 output 目录中对应的文件，或添加 --force 参数重新运行。")
+    if not to_process and len(source_files) > 0:
+        print("\n所有字幕文件均已存在翻译结果，无需重复翻译。")
+        print("如需重新翻译，请删除对应的输出文件，或添加 --force 参数重新运行。")
         return 0, len(skipped_files)
 
     processed_files = 0
-    for srt_path in to_process:
+    for source, output_path in to_process:
         start_time = datetime.now()
-        output_path = OUTPUT_DIR / srt_path.name
         print(f"\n{'=' * 60}")
-        print(f"开始处理文件: {srt_path.name}")
-        print(f"修改时间: {datetime.fromtimestamp(srt_path.stat().st_mtime)}")
-        print(f"大小: {srt_path.stat().st_size / 1024:.1f} KB")
+        print(f"开始处理文件: {source.name}")
+        print(f"修改时间: {datetime.fromtimestamp(source.stat().st_mtime)}")
+        print(f"大小: {source.stat().st_size / 1024:.1f} KB")
         print(f"输出到: {output_path}")
         print(f"{'=' * 60}")
         translated_content = translate_srt_file(
-            srt_path, api_key, base_url, model_name, lang, timeout, retries, workers
+            source, api_key, base_url, model_name, lang, timeout, retries, workers
         )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(translated_content, encoding="utf-8")
         processed_files += 1
         print(f"文件处理完成! 耗时: {(datetime.now() - start_time).total_seconds():.1f}秒")
@@ -282,11 +298,28 @@ def main():
     parser.add_argument("--workers", type=int, default=DEFAULT_TRANSLATE_WORKERS, help="翻译并发请求数")
     parser.add_argument("--timeout", type=int, default=120, help="单次 API 请求超时秒数")
     parser.add_argument("--retries", type=int, default=2, help="网络错误或限流时的重试次数")
-    parser.add_argument("--force", "-f", action="store_true", help="强制重新翻译，即使 output 目录已存在同名结果")
+    parser.add_argument("--force", "-f", action="store_true", help="强制重新翻译，即使输出文件已存在")
+    parser.add_argument(
+        "--input",
+        action="append",
+        metavar="PATH",
+        help="SRT 文件或文件夹，可重复指定；默认 ori 文件夹",
+    )
+    parser.add_argument("--output-dir", metavar="DIR", help="输出文件夹（默认 output）")
+    parser.add_argument(
+        "--save-to-source",
+        action="store_true",
+        help="保存到每个源文件所在目录，文件名加后缀，不覆盖原文件",
+    )
+    parser.add_argument("--suffix", default="_translated", help="配合 --save-to-source 使用的文件名后缀（默认 _translated）")
     args = parser.parse_args()
     if args.workers < 1:
         parser.error("--workers 必须大于 0")
 
+    source_display = ", ".join(args.input) if args.input else str(ORI_DIR)
+    output_display = (
+        f"源文件目录（后缀 {args.suffix}）" if args.save_to_source else (args.output_dir or str(OUTPUT_DIR))
+    )
     print(f"{'=' * 60}")
     print("API 批量翻译字幕")
     print(f"模型提供商: {runtime['provider_name']} ({runtime['provider_id']})")
@@ -296,8 +329,8 @@ def main():
     print(f"翻译并发: {args.workers}")
     print(f"失败重试: {args.retries} 次")
     print(f"强制重译: {'是' if args.force else '否 (已存在结果自动跳过)'}")
-    print(f"源文件夹: {ORI_DIR}")
-    print(f"输出文件夹: {OUTPUT_DIR}")
+    print(f"源文件: {source_display}")
+    print(f"输出位置: {output_display}")
     print(f"{'=' * 60}\n")
 
     start_time = datetime.now()
@@ -305,7 +338,18 @@ def main():
         api_key = get_api_key()
         base_url = runtime["base_url"] or DEFAULT_BASE_URL
         processed_count, skipped_count = process_ori_folder(
-            api_key, base_url, args.model, args.lang, args.timeout, args.retries, args.workers, args.force
+            api_key,
+            base_url,
+            args.model,
+            args.lang,
+            args.timeout,
+            args.retries,
+            args.workers,
+            args.force,
+            inputs=args.input,
+            output_dir=args.output_dir,
+            save_to_source=args.save_to_source,
+            suffix=args.suffix,
         )
     except Exception as error:
         print(f"\n发生错误: {error}")

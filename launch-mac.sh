@@ -1,5 +1,5 @@
 #!/bin/bash
-# Shared launcher for the four macOS Finder entry points (Bash 3.2 compatible).
+# Shared launcher for the macOS Finder entry points (Bash 3.2 compatible).
 set -e
 cd "$(dirname "$0")"
 export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:/Applications/Ollama.app/Contents/Resources"
@@ -30,15 +30,22 @@ mode="${1:-}"
 case "$mode" in
     trans|transopt) dependencies=(ollama tqdm); backend=ollama ;;
     transdeepseek|transoptdeepseek) dependencies=(tqdm); backend=deepseek ;;
-    provider) dependencies=(); backend=provider ;;
+    provider) dependencies=(); backend=gui ;;
+    aitrans) dependencies=(ollama tqdm); backend=gui ;;
     *) echo "错误：未知的启动模式。"; exit 1 ;;
 esac
 shift
 
-if [ "$mode" = "provider" ]; then
-    script="provider_gui.py"
+if [ "$mode" = "provider" ] || [ "$mode" = "aitrans" ]; then
+    script="aitrans_gui.py"
+    if [ "$mode" = "provider" ]; then
+        gui_args=(--tab provider)
+    else
+        gui_args=()
+    fi
 else
     script="$mode.py"
+    gui_args=()
 fi
 
 # Finder's PATH often does not include Homebrew. Keep dependencies local.
@@ -67,13 +74,13 @@ fi
 # Help must work without an API key or a running Ollama service.
 for argument in "$@"; do
     case "$argument" in
-        -h|--help) "$python" -B "$script" "$@"; exit $? ;;
+        -h|--help) "$python" -B "$script" "${gui_args[@]}" "$@"; exit $? ;;
     esac
 done
 
-# The provider GUI is self-contained; it only needs the local Python.
-if [ "$mode" = "provider" ]; then
-    "$python" -B "$script" "$@"
+# The unified GUI is self-contained; it only needs the local Python.
+if [ "$mode" = "provider" ] || [ "$mode" = "aitrans" ]; then
+    "$python" -B "$script" "${gui_args[@]}" "$@"
     exit $?
 fi
 
