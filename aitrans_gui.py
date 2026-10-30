@@ -155,6 +155,15 @@ def _format_time(timestamp):
     return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _platform_name():
+    """给前端用的平台标识，用于选择「在访达/资源管理器中显示」等文案。"""
+    if sys.platform.startswith("win"):
+        return "windows"
+    if sys.platform == "darwin":
+        return "macos"
+    return "linux"
+
+
 class App:
     def __init__(self):
         self.lock = threading.RLock()
@@ -351,14 +360,26 @@ class App:
         return dict(status)
 
     def _find_ollama(self):
-        candidates = [
-            shutil.which("ollama"),
-            "/Applications/Ollama.app/Contents/Resources/ollama",
-            "/opt/homebrew/bin/ollama",
-            "/usr/local/bin/ollama",
-        ]
+        candidates = [shutil.which("ollama")]
+        if sys.platform == "darwin":
+            candidates += [
+                "/Applications/Ollama.app/Contents/Resources/ollama",
+                "/opt/homebrew/bin/ollama",
+                "/usr/local/bin/ollama",
+            ]
+        elif sys.platform.startswith("win"):
+            # Windows 安装包默认放在 %LOCALAPPDATA%\Programs\Ollama。
+            for root in (
+                os.environ.get("LOCALAPPDATA"),
+                os.environ.get("PROGRAMFILES"),
+                os.environ.get("PROGRAMFILES(X86)"),
+            ):
+                if not root:
+                    continue
+                candidates.append(str(Path(root) / "Programs" / "Ollama" / "ollama.exe"))
+                candidates.append(str(Path(root) / "Ollama" / "ollama.exe"))
         for candidate in candidates:
-            if candidate and Path(candidate).exists():
+            if candidate and Path(candidate).is_file():
                 return candidate
         return None
 
@@ -380,14 +401,17 @@ class App:
             except OSError:
                 pass
         self.ollama_log = open(log_path, "ab", buffering=0)
+        popen_options = {
+            "cwd": str(HERE),
+            "stdout": self.ollama_log,
+            "stderr": subprocess.STDOUT,
+            "start_new_session": True,
+        }
+        if sys.platform.startswith("win"):
+            # 不要让 Ollama 在 Windows 上额外弹出控制台窗口。
+            popen_options["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         try:
-            process = subprocess.Popen(
-                [executable, "serve"],
-                cwd=str(HERE),
-                stdout=self.ollama_log,
-                stderr=subprocess.STDOUT,
-                start_new_session=True,
-            )
+            process = subprocess.Popen([executable, "serve"], **popen_options)
         except OSError as error:
             raise GuiError(f"无法启动 Ollama：{error}") from error
 
@@ -553,9 +577,17 @@ class App:
             raise GuiError("未知的翻译引擎。")
 
         if importlib.util.find_spec("tqdm") is None:
-            raise GuiError("缺少 tqdm 依赖，请通过 aitrans.command 启动以自动安装依赖。")
+            raise GuiError(
+                pg.localize_launcher_text(
+                    "缺少 tqdm 依赖，请通过 aitrans.command 启动以自动安装依赖。"
+                )
+            )
         if settings["backend"] == "ollama" and importlib.util.find_spec("ollama") is None:
-            raise GuiError("缺少 ollama 依赖，请通过 aitrans.command 启动以自动安装依赖。")
+            raise GuiError(
+                pg.localize_launcher_text(
+                    "缺少 ollama 依赖，请通过 aitrans.command 启动以自动安装依赖。"
+                )
+            )
 
         if settings["backend"] == "api":
             try:
@@ -661,6 +693,9 @@ class App:
             environment = os.environ.copy()
             environment["PYTHONUNBUFFERED"] = "1"
             environment["PYTHONDONTWRITEBYTECODE"] = "1"
+            # 固定子进程输出编码，避免 Windows 控制台代码页导致日志乱码。
+            environment["PYTHONIOENCODING"] = "utf-8"
+            environment["PYTHONUTF8"] = "1"
 
             process = None
             try:
@@ -671,6 +706,8 @@ class App:
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     bufsize=1,
                     start_new_session=True,
                 )
@@ -772,6 +809,13 @@ class App:
     def _signal_process(process):
         if process is None or process.poll() is not None:
             return
+        if sys.platform.startswith("win"):
+            # Windows 没有进程组信号，直接结束翻译子进程。
+            try:
+                process.terminate()
+            except OSError:
+                pass
+            return
         try:
             os.killpg(os.getpgid(process.pid), signal.SIGTERM)
         except (AttributeError, ProcessLookupError, PermissionError, OSError):
@@ -783,8 +827,14 @@ class App:
     # ---------- 选择文件 / 结果 ----------
 
     def pick_paths(self, kind):
-        if sys.platform != "darwin":
-            raise GuiError("当前系统不支持原生文件选择，请拖入文件或手动输入路径。")
+        if sys.platform == "darwin":
+            return self._pick_macos(kind)
+        if sys.platform.startswith("win"):
+            return self._pick_windows(kind)
+        raise GuiError("当前系统不支持原生文件选择，请拖入文件或手动输入路径。")
+
+    @staticmethod
+    def _pick_macos(kind):
         if kind == "folder":
             script = 'POSIX path of (choose folder with prompt "选择包含 SRT 字幕的文件夹")'
         else:
@@ -816,6 +866,45 @@ return output
                 return {"canceled": True}
             raise GuiError(f"文件选择器出错：{message or '未知错误'}")
         paths = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        if not paths:
+            return {"canceled": True}
+        return {"paths": paths}
+
+    @staticmethod
+    def _pick_windows(kind):
+        """用子进程调用 Windows 原生文件/文件夹选择器。"""
+        environment = os.environ.copy()
+        # 路径可能包含中文，固定子进程输出编码后再解析 JSON。
+        environment["PYTHONIOENCODING"] = "utf-8"
+        try:
+            result = subprocess.run(
+                [sys.executable, "-B", str(HERE / "windows_picker.py"), kind],
+                capture_output=True,
+                env=environment,
+                timeout=600,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise GuiError(f"无法打开文件选择器：{error}") from error
+
+        if result.returncode != 0:
+            message = result.stderr.decode("utf-8", errors="replace").strip()
+            if "ModuleNotFoundError" in message and "tkinter" in message:
+                raise GuiError(
+                    "当前 Python 没有安装 tkinter，无法打开文件选择器。"
+                    "可以拖入文件，或直接粘贴文件/文件夹路径。"
+                )
+            raise GuiError(f"文件选择器出错：{message or '未知错误'}")
+
+        try:
+            payload = json.loads(result.stdout.decode("utf-8", errors="replace") or "{}")
+        except ValueError as error:
+            raise GuiError("文件选择器返回了无法识别的结果。") from error
+
+        paths = [
+            str(item).strip()
+            for item in payload.get("paths") or []
+            if str(item).strip()
+        ]
         if not paths:
             return {"canceled": True}
         return {"paths": paths}
@@ -857,7 +946,7 @@ return output
             else:
                 subprocess.Popen(["xdg-open", str(target.parent)])
         except OSError as error:
-            raise GuiError(f"无法打开 Finder：{error}") from error
+            raise GuiError(f"无法打开文件管理器：{error}") from error
 
     # ---------- 状态 / 退出 ----------
 
@@ -889,6 +978,7 @@ return output
         state["translate"] = {
             "settings": settings,
             "settings_from_file": self.settings_from_file,
+            "platform": _platform_name(),
             "provider": provider,
             "ollama": self.ollama_status(),
             "files": self._snapshot_files(),
@@ -929,6 +1019,7 @@ class Handler(pg.Handler):
             self._send_text(500, f"找不到界面文件 {path.name}：{error}")
             return
         html = html.replace("__AITRANS_TOKEN__", self.server.token)
+        html = pg.localize_launcher_text(html)
         self._send_html(200, html)
 
     def do_GET(self):  # noqa: N802 - 匹配基类命名
@@ -1108,6 +1199,12 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if not 0 <= args.port <= 65535:
         parser.error("--port 必须在 0 到 65535 之间")
+
+    try:
+        # 输出被重定向时也立即打印访问地址。
+        sys.stdout.reconfigure(line_buffering=True)
+    except (AttributeError, OSError):
+        pass
 
     pc.harden_permissions()
     app = App()

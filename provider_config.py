@@ -2,7 +2,7 @@
 
 - providers.json：保存所有提供商配置（含 API Key，文件权限 600）。
 - .env：保存当前启用的提供商，翻译脚本从这里读取运行时配置。
-- provider.command：图形化工具，通过本模块读写以上两个文件。
+- provider.command / provider.bat：图形化工具，通过本模块读写以上两个文件。
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
@@ -23,9 +24,14 @@ DEFAULT_PROVIDER_NAME = "DeepSeek"
 DEFAULT_BASE_URL = "https://api.deepseek.com"
 DEFAULT_MODEL = "deepseek-flash"
 
-ENV_HEADER = "# ===== AItrans 模型提供商（由 provider.command 管理，请勿手工编辑本节）====="
+# 提示文案里引用的启动器：Windows 用 .bat，其他系统用 .command。
+LAUNCHER_NAME = "provider.bat" if sys.platform.startswith("win") else "provider.command"
+
+ENV_HEADER_PREFIX = "# ===== AItrans 模型提供商"
 ENV_ACTIVE_PREFIX = "# 当前提供商："
-ENV_EMPTY_LINE = "# 尚未选择模型提供商：请双击 provider.command 配置"
+ENV_EMPTY_PREFIX = "# 尚未选择模型提供商"
+ENV_HEADER = f"{ENV_HEADER_PREFIX}（由 {LAUNCHER_NAME} 管理，请勿手工编辑本节）====="
+ENV_EMPTY_LINE = f"{ENV_EMPTY_PREFIX}：请双击 {LAUNCHER_NAME} 配置"
 MANAGED_ENV_KEYS = (
     "AI_PROVIDER",
     "AI_PROVIDER_NAME",
@@ -412,8 +418,8 @@ def write_env_file(store, path=ENV_PATH):
         for raw_line in original:
             stripped = raw_line.strip()
             if (
-                stripped == ENV_HEADER
-                or stripped == ENV_EMPTY_LINE
+                stripped.startswith(ENV_HEADER_PREFIX)
+                or stripped.startswith(ENV_EMPTY_PREFIX)
                 or stripped.startswith(ENV_ACTIVE_PREFIX)
             ):
                 continue

@@ -742,6 +742,10 @@
     return String(path || "").split(/[\\/]/).filter(Boolean).pop() || "";
   }
 
+  function platformName() {
+    return (state && state.translate && state.translate.platform) || "";
+  }
+
   function downloadUrl(id) {
     return `/api/download?id=${encodeURIComponent(id)}&token=${encodeURIComponent(TOKEN)}`;
   }
@@ -1540,7 +1544,7 @@
         const reveal = document.createElement("button");
         reveal.className = "btn secondary small";
         reveal.type = "button";
-        reveal.textContent = "在 Finder 中显示";
+        reveal.textContent = platformName() === "windows" ? "在资源管理器中显示" : "在 Finder 中显示";
         reveal.addEventListener("click", () => revealResult(result.output));
         actions.append(reveal);
       }

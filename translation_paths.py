@@ -17,6 +17,20 @@ class PathError(ValueError):
     """输入或输出路径不合法。"""
 
 
+def read_text_file(path):
+    """读取字幕文本：优先 UTF-8（含 BOM），兼容 Windows 常见的 UTF-16 与 GBK/GB18030。"""
+    data = Path(path).read_bytes()
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        # 记事本另存为「Unicode」时会产生带 BOM 的 UTF-16。
+        return data.decode("utf-16")
+    for encoding in ("utf-8-sig", "gb18030"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("utf-8", errors="replace")
+
+
 def collect_srt_files(inputs, default_dir):
     """展开文件/文件夹参数，返回去重后的 SRT 路径列表。
 

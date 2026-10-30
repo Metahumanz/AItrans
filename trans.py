@@ -10,15 +10,15 @@ from pathlib import Path
 import ollama
 from tqdm import tqdm
 
-from translation_paths import collect_srt_files, prepare_outputs
+from translation_paths import collect_srt_files, prepare_outputs, read_text_file
 
 
 def translate_srt_file(srt_path, model_name, lang="zh"):
     """翻译单个 SRT 文件，将译文放在原文上方。"""
-    with open(srt_path, "r", encoding="utf-8") as file:
-        srt_content = file.read()
+    srt_content = read_text_file(srt_path)
 
-    blocks = srt_content.strip().split("\n\n")
+    blocks = re.split(r"\r?\n\r?\n", srt_content.strip()) if srt_content.strip() else []
+    total_blocks = len(blocks) or 1
     progress_bar = tqdm(
         total=len(blocks),
         desc=f"翻译字幕: {os.path.basename(srt_path)}",
@@ -32,7 +32,7 @@ def translate_srt_file(srt_path, model_name, lang="zh"):
     start_time = time.time()
 
     for block in blocks:
-        lines = block.split("\n")
+        lines = block.splitlines()
         if len(lines) < 3:
             translated_blocks.append(block)
             progress_bar.update(1)
@@ -80,8 +80,8 @@ def translate_srt_file(srt_path, model_name, lang="zh"):
 
     print("\n翻译摘要:")
     print(f"  - 总字幕块: {len(blocks)}")
-    print(f"  - 成功翻译: {translated_count} ({translated_count / len(blocks) * 100:.1f}%)")
-    print(f"  - 翻译错误: {error_count} ({error_count / len(blocks) * 100:.1f}%)")
+    print(f"  - 成功翻译: {translated_count} ({translated_count / total_blocks * 100:.1f}%)")
+    print(f"  - 翻译错误: {error_count} ({error_count / total_blocks * 100:.1f}%)")
     print(f"  - 处理时间: {elapsed:.1f}秒")
     print(f"  - 平均速度: {speed:.1f} 块/秒")
 
@@ -140,7 +140,7 @@ def process_ori_folder(
 
         translated_content = translate_srt_file(source, model_name, lang)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(translated_content, encoding="utf-8")
+        output_path.write_text(translated_content, encoding="utf-8", newline="\n")
 
         processed_files += 1
         duration = (datetime.now() - start_time).total_seconds()

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from translation_paths import collect_srt_files, prepare_outputs
+from translation_paths import collect_srt_files, prepare_outputs, read_text_file
 from provider_config import (
     DEFAULT_BASE_URL,
     DEFAULT_MODEL,
@@ -29,7 +29,7 @@ DEFAULT_OPTIMIZE_WORKERS = 5
 
 def translate_file(srt_path, api_key, base_url, model_name, lang, timeout, retries, workers):
     """第一阶段：并发翻译整个 SRT 文件。"""
-    srt_content = srt_path.read_text(encoding="utf-8-sig")
+    srt_content = read_text_file(srt_path)
     blocks = re.split(r"\r?\n\r?\n", srt_content.strip()) if srt_content.strip() else []
     progress_bar = tqdm(
         total=len(blocks),
@@ -330,7 +330,7 @@ def process_ori_folder(
             optimize_workers,
         )
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(assemble_srt(parsed_blocks), encoding="utf-8")
+        output_path.write_text(assemble_srt(parsed_blocks), encoding="utf-8", newline="\n")
         processed_files += 1
         print(f"文件处理完成! 耗时: {(datetime.now() - start_time).total_seconds():.1f}秒")
     return processed_files, len(skipped_files)

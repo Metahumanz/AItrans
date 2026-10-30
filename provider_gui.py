@@ -26,6 +26,25 @@ HERE = Path(__file__).resolve().parent
 HTML_PATH = HERE / "provider_gui.html"
 MAX_BODY_BYTES = 1_000_000
 
+LAUNCHER_EXTENSION = ".bat" if sys.platform.startswith("win") else ".command"
+_LAUNCHER_NAMES = (
+    "transoptdeepseek",
+    "transdeepseek",
+    "transopt",
+    "trans",
+    "aitrans",
+    "provider",
+)
+
+
+def localize_launcher_text(text):
+    """把界面文案里的 .command 启动器换成当前系统的实际文件名。"""
+    if not text or LAUNCHER_EXTENSION == ".command":
+        return text
+    for name in _LAUNCHER_NAMES:
+        text = text.replace(f"{name}.command", f"{name}{LAUNCHER_EXTENSION}")
+    return text
+
 
 class GuiError(Exception):
     """可以直接展示给用户的错误。"""
@@ -278,6 +297,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _send_json(self, status, payload):
+        if isinstance(payload, dict) and isinstance(payload.get("error"), str):
+            payload = {**payload, "error": localize_launcher_text(payload["error"])}
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self._send_bytes(status, "application/json; charset=utf-8", body)
 
@@ -285,11 +306,15 @@ class Handler(BaseHTTPRequestHandler):
         self._send_bytes(
             status,
             "text/plain; charset=utf-8",
-            text.encode("utf-8"),
+            localize_launcher_text(text).encode("utf-8"),
         )
 
     def _send_html(self, status, html):
-        self._send_bytes(status, "text/html; charset=utf-8", html.encode("utf-8"))
+        self._send_bytes(
+            status,
+            "text/html; charset=utf-8",
+            localize_launcher_text(html).encode("utf-8"),
+        )
 
     def _read_json(self):
         try:

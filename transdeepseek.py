@@ -15,7 +15,7 @@ from urllib.request import Request, urlopen
 
 from tqdm import tqdm
 
-from translation_paths import collect_srt_files, prepare_outputs
+from translation_paths import collect_srt_files, prepare_outputs, read_text_file
 from provider_config import (
     DEFAULT_BASE_URL,
     DEFAULT_MODEL,
@@ -155,7 +155,7 @@ def translate_srt_file(
     workers=DEFAULT_TRANSLATE_WORKERS,
 ):
     """并发翻译单个 SRT 文件，将译文放在原文上方。"""
-    srt_content = srt_path.read_text(encoding="utf-8-sig")
+    srt_content = read_text_file(srt_path)
     blocks = re.split(r"\r?\n\r?\n", srt_content.strip()) if srt_content.strip() else []
     progress_bar = tqdm(
         total=len(blocks),
@@ -278,7 +278,7 @@ def process_ori_folder(
             source, api_key, base_url, model_name, lang, timeout, retries, workers
         )
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(translated_content, encoding="utf-8")
+        output_path.write_text(translated_content, encoding="utf-8", newline="\n")
         processed_files += 1
         print(f"文件处理完成! 耗时: {(datetime.now() - start_time).total_seconds():.1f}秒")
     return processed_files, len(skipped_files)

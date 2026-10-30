@@ -10,15 +10,14 @@ from pathlib import Path
 import ollama
 from tqdm import tqdm
 
-from translation_paths import collect_srt_files, prepare_outputs
+from translation_paths import collect_srt_files, prepare_outputs, read_text_file
 
 
 def translate_file(srt_path, model_name, lang="zh"):
     """第一阶段：翻译整个 SRT 文件，返回字幕块。"""
-    with open(srt_path, "r", encoding="utf-8") as file:
-        srt_content = file.read()
+    srt_content = read_text_file(srt_path)
 
-    blocks = srt_content.strip().split("\n\n")
+    blocks = re.split(r"\r?\n\r?\n", srt_content.strip()) if srt_content.strip() else []
     progress_bar = tqdm(
         total=len(blocks),
         desc=f"[翻译] {os.path.basename(srt_path)}",
@@ -33,7 +32,7 @@ def translate_file(srt_path, model_name, lang="zh"):
     start_time = time.time()
 
     for block in blocks:
-        lines = block.split("\n")
+        lines = block.splitlines()
         if len(lines) < 3:
             parsed.append({"raw": block, "valid": False})
             progress_bar.update(1)
@@ -108,7 +107,7 @@ def parse_batch_result(result_text, batch_indices):
                     optimized_map[index] = text.strip()
 
     if len(optimized_map) < len(batch_indices) // 2:
-        lines = [line.strip() for line in result_text.strip().split("\n") if line.strip()]
+        lines = [line.strip() for line in result_text.strip().splitlines() if line.strip()]
         if len(lines) == len(batch_indices):
             optimized_map.clear()
             for index, line in zip(batch_indices, lines):
@@ -269,7 +268,7 @@ def process_folder(
         parsed = translate_file(source, model_name, lang)
         parsed = optimize_translations(parsed, model_name)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(assemble_srt(parsed), encoding="utf-8")
+        output_path.write_text(assemble_srt(parsed), encoding="utf-8", newline="\n")
 
         print(f"  文件完成! 总耗时: {(datetime.now() - file_start).total_seconds():.1f}秒\n")
         processed += 1
