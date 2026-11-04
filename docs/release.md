@@ -1,6 +1,6 @@
 # 发布与更新
 
-> 状态：macOS 与 Windows 的构建、测试、打包均已在 CI 验证通过；`v*` 标签触发创建 Release 这一步尚未真实跑过。
+> 状态：`v0.1.0` 已走通完整流程——tag 推送 → 双端构建 → 创建 Release，产物可下载。
 
 ## 1. 发布方式
 
@@ -21,8 +21,8 @@ git push origin v2.0.0
 
 | 平台 | 产物 | 说明 |
 | --- | --- | --- |
-| macOS | `AITrans-<version>-arm64.zip` | `.app` 压缩包，解压后拖入「应用程序」 |
-| Windows | `AITrans-<version>-win-x64.zip` | 自包含目录，解压后运行 `AITrans.exe` |
+| macOS | `AITrans-<version>-arm64.zip` | `.app` 压缩包（约 370 KB），解压后拖入「应用程序」 |
+| Windows | `AITrans-<version>-win-x64.zip` | 自包含目录（约 85 MB），解压后运行 `AITrans.exe` |
 
 ## 3. 不签名的影响
 
