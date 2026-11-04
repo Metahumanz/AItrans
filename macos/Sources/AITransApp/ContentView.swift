@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var showFolderImporter = false
     @State private var showProviders = false
     @State private var isTargeted = false
+    @State private var pathInput = ""
 
     private var srtType: UTType {
         UTType(filenameExtension: "srt") ?? .plainText
@@ -127,6 +128,16 @@ struct ContentView: View {
 
     private var fileColumn: some View {
         VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                TextField("粘贴文件或文件夹路径", text: $pathInput)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { submitPath() }
+                Button("添加") { submitPath() }
+                    .disabled(pathInput.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
             if state.files.isEmpty {
                 emptyState
             } else {
@@ -261,6 +272,11 @@ struct ContentView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private func submitPath() {
+        state.addPath(pathInput)
+        pathInput = ""
     }
 
     private var modelBinding: Binding<String> {

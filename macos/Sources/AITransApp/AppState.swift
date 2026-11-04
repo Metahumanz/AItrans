@@ -97,6 +97,19 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// 从粘贴的路径添加（支持 ~ 展开与文件夹）。
+    func addPath(_ raw: String) {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let expanded = (trimmed as NSString).expandingTildeInPath
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: expanded, isDirectory: &isDirectory) else {
+            alertMessage = "路径不存在：\(expanded)"
+            return
+        }
+        addFiles([URL(fileURLWithPath: expanded)])
+    }
+
     func removeFiles(at offsets: IndexSet) {
         files.remove(atOffsets: offsets)
     }

@@ -263,6 +263,42 @@ public sealed partial class MainWindow : Window
         RefreshFiles();
     }
 
+    private void OnAddPath(object sender, RoutedEventArgs e)
+    {
+        AddPathFromBox();
+    }
+
+    private void OnPathKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+    {
+        if (e.Key != Windows.System.VirtualKey.Enter) return;
+        AddPathFromBox();
+        e.Handled = true;
+    }
+
+    private void AddPathFromBox()
+    {
+        var raw = (PathBox.Text ?? "").Trim().Trim('"');
+        if (raw.Length == 0) return;
+
+        var expanded = Environment.ExpandEnvironmentVariables(raw);
+        if (!Path.IsPathRooted(expanded))
+        {
+            _ = ShowMessageAsync("请填写完整路径（例如 C:\\Movies\\a.srt）。");
+            return;
+        }
+        if (!File.Exists(expanded) && !Directory.Exists(expanded))
+        {
+            _ = ShowMessageAsync($"路径不存在：{expanded}");
+            return;
+        }
+
+        if (Directory.Exists(expanded)) AddFolder(expanded);
+        else AddFile(expanded);
+
+        PathBox.Text = "";
+        RefreshFiles();
+    }
+
     private void OnFileListDragOver(object sender, DragEventArgs e)
     {
         e.AcceptedOperation = DataPackageOperation.Copy;

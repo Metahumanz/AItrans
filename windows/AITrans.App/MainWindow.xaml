@@ -11,6 +11,7 @@
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -61,8 +62,21 @@
             </Button>
         </Grid>
 
+        <!-- 路径输入 -->
+        <Grid Grid.Row="1" Padding="16,0,16,8" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox
+                x:Name="PathBox"
+                PlaceholderText="粘贴文件或文件夹路径"
+                KeyDown="OnPathKeyDown" />
+            <Button Grid.Column="1" Content="添加" Click="OnAddPath" />
+        </Grid>
+
         <!-- 主体 -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -134,7 +148,7 @@
         </Grid>
 
         <!-- 状态栏 -->
-        <Grid Grid.Row="2" Padding="16,10" RowSpacing="6">
+        <Grid Grid.Row="3" Padding="16,10" RowSpacing="6">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
