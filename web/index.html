@@ -2063,10 +2063,19 @@
           saved += 1;
         }
       }
-      if (saved) showToast(`已写回 ${saved} 个结果到 ${outcome.dir || dir}`, "success", 5000);
+      const existing = outcome.existing || [];
       const skipped = outcome.skipped || [];
-      if (skipped.length) {
-        showToast(`有 ${skipped.length} 个未写回：${skipped[0]}`, "warning", 6000);
+      if (saved) {
+        if (existing.length || skipped.length) {
+          const details = [`已写回 ${saved} 个`];
+          if (existing.length) details.push(`${existing.length} 个已存在未覆盖`);
+          if (skipped.length) details.push(`${skipped.length} 个失败`);
+          showToast(`${details.join("，")}：${existing[0] || skipped[0]}`, "warning", 7000);
+        } else {
+          showToast(`已写回 ${saved} 个结果到 ${outcome.dir || dir}`, "success", 5000);
+        }
+      } else if (existing.length || skipped.length) {
+        showToast(`没有覆盖任何文件：${existing[0] || skipped[0]}`, "warning", 7000);
       }
       renderResults();
     } catch (error) {

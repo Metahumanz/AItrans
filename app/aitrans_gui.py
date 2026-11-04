@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import argparse
+import filecmp
 import importlib.util
 import json
 import os
@@ -222,6 +223,56 @@ def _relative_write_name(relative_name, file_name):
     return "/".join(parts) or file_name
 
 
+def _same_file_content(left, right):
+    """判断两个文件内容是否一致；大小不同直接判否。"""
+    try:
+        if left.stat().st_size != right.stat().st_size:
+            return False
+        return filecmp.cmp(left, right, shallow=False)
+    except OSError:
+        return False
+
+
+STALE_TEMP_HOURS = 24
+
+
+def _cleanup_stale_temp_dirs(keep):
+    """清掉上次异常退出留下的临时目录，保留当前会话和一天内的。"""
+    try:
+        cutoff = time.time() - STALE_TEMP_HOURS * 3600
+        keep_path = Path(keep).resolve()
+        for entry in Path(tempfile.gettempdir()).glob("aitrans-gui-*"):
+            try:
+                if not entry.is_dir() or entry.resolve() == keep_path:
+                    continue
+                if entry.stat().st_mtime > cutoff:
+                    continue
+            except OSError:
+                continue
+            shutil.rmtree(entry, ignore_errors=True)
+    except OSError:
+        pass
+
+
+def _bring_finder_to_front():
+    """让系统选择框尽量出现在最前面。
+
+    osascript 由终端启动时没有焦点，选择框偶尔会藏在浏览器窗口后面。
+    失败时静默忽略，不影响选择框本身。
+    """
+    if sys.platform != "darwin":
+        return
+    try:
+        subprocess.run(
+            ["osascript", "-e", 'tell application "Finder" to activate'],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
 class App:
     def __init__(self):
         self.lock = threading.RLock()
@@ -236,6 +287,7 @@ class App:
         self.job = None
         self.job_thread = None
         self.upload_root = Path(tempfile.mkdtemp(prefix="aitrans-gui-"))
+        _cleanup_stale_temp_dirs(self.upload_root)
         self.downloads = {}
         self.quit_requested = False
         self.ollama_process = None
@@ -934,6 +986,7 @@ class App:
 
     @staticmethod
     def _pick_macos(kind):
+        _bring_finder_to_front()
         if kind == "folder":
             script = 'POSIX path of (choose folder with prompt "选择包含 SRT 字幕的文件夹")'
         else:
@@ -1057,6 +1110,7 @@ return output
             raise GuiError("没有需要写回的结果。")
 
         written = []
+        existing = []
         skipped = []
         for result, source in pending:
             name = _safe_relative_name(
@@ -1077,15 +1131,30 @@ return output
             try:
                 destination = target_root / name
                 destination.parent.mkdir(parents=True, exist_ok=True)
+                if destination.exists():
+                    if destination.is_dir():
+                        skipped.append(f"{name}：目标位置已是文件夹")
+                        continue
+                    # 内容一致就当作已写回，内容不同则不覆盖用户可能改过的文件。
+                    if _same_file_content(resolved, destination):
+                        written.append(name)
+                        continue
+                    existing.append(name)
+                    continue
                 shutil.copy2(resolved, destination)
             except OSError as error:
                 skipped.append(f"{name}：{error}")
                 continue
             written.append(name)
 
-        if not written and skipped:
+        if not written and not existing and skipped:
             raise GuiError(f"没有写回任何文件：{skipped[0]}")
-        return {"dir": str(target_root), "written": written, "skipped": skipped}
+        return {
+            "dir": str(target_root),
+            "written": written,
+            "existing": existing,
+            "skipped": skipped,
+        }
 
     def reveal(self, raw_path):
         if not isinstance(raw_path, str) or not raw_path.strip():
