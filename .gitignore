@@ -72,3 +72,6 @@ macos/dist/
 windows/**/bin/
 windows/**/obj/
 windows/dist/
+
+# gh 日志缓存（受限环境用）
+/.cache-gh/

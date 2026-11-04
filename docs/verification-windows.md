@@ -1,7 +1,7 @@
 # Windows 端验证清单
 
 > 用途：你在 Windows 机器上验证时按此逐项勾选，把失败项连同日志反馈。
-> 状态：`windows/` 尚未落地，本清单先固化验收口径。
+> 状态：`windows/AITrans.Core` 已落地并通过 CI 测试；WinUI 界面尚未开始，本清单先固化验收口径。
 
 ## 0. 环境
 
@@ -12,9 +12,8 @@
 ## 1. 构建
 
 ```bat
-cd windows
-dotnet build -c Release
-dotnet test
+dotnet build windows/AITrans.Core/AITrans.Core.csproj -c Release
+dotnet test windows/AITrans.Core.Tests/AITrans.Core.Tests.csproj -c Release
 ```
 
 - [ ] 构建无警告失败
