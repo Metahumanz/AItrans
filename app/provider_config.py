@@ -2,7 +2,7 @@
 
 - providers.json：保存所有提供商配置（含 API Key，文件权限 600）。
 - .env：保存当前启用的提供商，翻译脚本从这里读取运行时配置。
-- provider.command / provider.bat：图形化工具，通过本模块读写以上两个文件。
+- launchers/provider.command / provider.bat：图形化工具，通过本模块读写以上两个文件。
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_PATH = BASE_DIR / ".env"
 PROFILES_PATH = BASE_DIR / "providers.json"
 
@@ -25,7 +25,11 @@ DEFAULT_BASE_URL = "https://api.deepseek.com"
 DEFAULT_MODEL = "deepseek-flash"
 
 # 提示文案里引用的启动器：Windows 用 .bat，其他系统用 .command。
-LAUNCHER_NAME = "provider.bat" if sys.platform.startswith("win") else "provider.command"
+LAUNCHER_NAME = (
+    "launchers/provider.bat"
+    if sys.platform.startswith("win")
+    else "launchers/provider.command"
+)
 
 ENV_HEADER_PREFIX = "# ===== AItrans 模型提供商"
 ENV_ACTIVE_PREFIX = "# 当前提供商："
@@ -434,7 +438,7 @@ def write_env_file(store, path=ENV_PATH):
 
     block = [ENV_HEADER]
     if active is None:
-        block.append("# 尚未选择模型提供商：请双击 provider.command 配置")
+        block.append("# 尚未选择模型提供商：请双击 launchers/provider.command 配置")
     else:
         block.append(f"# 当前提供商：{active['name']}")
         block.append(f"AI_PROVIDER={_format_env_value(active['id'])}")
@@ -562,7 +566,7 @@ def get_api_key():
     if not config["api_key"] and config["requires_key"]:
         raise RuntimeError(
             f"未找到「{config['provider_name']}」的 API Key。"
-            "请双击 provider.command 在图形界面中配置，"
+            "请双击 launchers/provider.command 在图形界面中配置，"
             "或运行对应的 .command 按提示输入。"
         )
     return config["api_key"]

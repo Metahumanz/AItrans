@@ -249,26 +249,31 @@
   .field { min-width: 0; }
   .field label { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 5px; color: var(--muted); font-size: 11px; }
   .field label .hint { color: var(--faint); font-weight: 400; }
-  input[type="text"], select {
+  input[type="text"], input[type="url"], input[type="password"], input[type="number"], select {
     width: 100%; height: 36px; padding: 0 10px;
     border: 1px solid var(--border); border-radius: 9px;
     background: var(--panel-solid); color: var(--text); outline: 0;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
-  input[type="text"]:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-  input[type="text"]::placeholder { color: var(--faint); }
-  input[type="text"]:disabled, select:disabled { opacity: 0.55; cursor: not-allowed; }
+  input[type="text"]:focus, input[type="url"]:focus, input[type="password"]:focus,
+  input[type="number"]:focus, select:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  input[type="text"]::placeholder, input[type="url"]::placeholder,
+  input[type="password"]::placeholder, input[type="number"]::placeholder { color: var(--faint); }
+  input[type="text"]:disabled, input[type="url"]:disabled, input[type="password"]:disabled,
+  input[type="number"]:disabled, select:disabled { opacity: 0.55; cursor: not-allowed; }
 
-  .output-modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin: 4px 0 9px; }
-  .output-card {
+  .output-modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin: 4px 0 9px; }  .output-card {
     padding: 8px 9px; border: 1px solid var(--border); border-radius: 10px;
     background: var(--panel-solid); text-align: left; font-size: 11.5px; color: var(--muted);
   }
   .output-card strong { display: block; color: var(--text); font-size: 11.5px; }
   .output-card span { display: block; margin-top: 1px; color: var(--faint); font-size: 9.5px; }
   .output-card.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
-  .output-extra { display: flex; gap: 7px; margin-top: 7px; }
+  .output-extra { display: flex; align-items: center; gap: 7px; margin-top: 7px; }
   .output-extra input { min-width: 0; flex: 1; }
+  .output-extra-label { flex: 0 0 auto; color: var(--muted); font-size: 11px; white-space: nowrap; }
 
   .force-row {
     display: flex; align-items: center; gap: 8px; margin: 12px 0 4px;
@@ -363,6 +368,42 @@
   .quit-btn { border: 0; background: transparent; color: var(--faint); padding: 0; font-size: 10px; }
   .quit-btn:hover { color: var(--text); text-decoration: underline; }
 
+  /* ---------- 提供商 ---------- */
+  .provider-layout { grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); }
+  .provider-list-panel { display: flex; flex-direction: column; min-height: 420px; padding-bottom: 14px; }
+  .provider-list { display: flex; flex-direction: column; gap: 6px; padding: 0 14px; overflow: auto; flex: 1; min-height: 0; }
+  .provider-item {
+    display: flex; flex-direction: column; gap: 3px; width: 100%;
+    padding: 9px 11px; text-align: left; color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--panel-soft);
+  }
+  .provider-item:hover { border-color: var(--border-strong); }
+  .provider-item.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .provider-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .provider-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 650; }
+  .provider-pill { flex: 0 0 auto; padding: 1px 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-text); font-size: 9.5px; font-weight: 700; }
+  .provider-meta { display: flex; gap: 7px; color: var(--muted); font-size: 10.5px; }
+  .provider-meta .key-warning { color: var(--warning); }
+  .provider-host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--faint); font-size: 10px; }
+  .provider-empty { padding: 18px 12px; text-align: center; color: var(--muted); font-size: 11.5px; line-height: 1.7; }
+  .provider-preset { display: flex; gap: 6px; padding: 12px 14px 0; }
+  .provider-preset select { flex: 1; min-width: 0; }
+  .provider-editor { padding: 18px; }
+  .provider-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .provider-actions .spacer { flex: 1; }
+  .provider-note { margin: 10px 14px 0; color: var(--faint); font-size: 10.5px; line-height: 1.6; }
+  .key-row { display: flex; gap: 6px; }
+  .key-row input { flex: 1; min-width: 0; }
+  .test-result {
+    display: flex; gap: 8px; align-items: flex-start; margin-top: 12px;
+    padding: 9px 11px; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--panel-soft); font-size: 11.5px; line-height: 1.6;
+  }
+  .test-result.ok { border-color: var(--success-soft); color: var(--success); }
+  .test-result.warn { border-color: var(--warning-soft); color: var(--warning); }
+  .test-result.error { border-color: var(--danger-soft); color: var(--danger); }
+
   /* ---------- 拖放遮罩 / toast ---------- */
   .drop-overlay {
     position: fixed; inset: 0; z-index: 50; display: none;
@@ -437,8 +478,8 @@
     </div>
     <div class="top-actions">
       <nav class="nav" aria-label="主导航">
-        <a class="active" href="/">翻译</a>
-        <a id="providerLink" href="/provider">提供商</a>
+        <a class="active" id="tabTranslate" href="#translate" data-tab="translate">翻译</a>
+        <a id="tabProvider" href="#provider" data-tab="provider">提供商</a>
       </nav>
       <label class="quick-switch" title="快速切换当前模型提供商">
         <span class="dot" aria-hidden="true"></span>
@@ -448,7 +489,7 @@
     </div>
   </header>
 
-  <main class="layout">
+  <main class="layout" id="view-translate">
     <section class="panel files-panel" aria-label="待翻译文件">
       <div class="panel-head">
         <h2>待翻译文件 <span class="count" id="fileCount">0</span></h2>
@@ -531,6 +572,18 @@
           </div>
         </div>
 
+        <div class="section-title" style="margin-top: 15px;"><h3>并发与重试</h3><span class="saved-indicator" id="workersHint">同时请求数</span></div>
+        <div class="field-grid">
+          <div class="field">
+            <label for="workersInput">并发数 <span class="hint">1–64</span></label>
+            <input id="workersInput" type="number" min="1" max="64" step="1" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="retriesInput">失败重试 <span class="hint">0–5 次</span></label>
+            <input id="retriesInput" type="number" min="0" max="5" step="1" inputmode="numeric">
+          </div>
+        </div>
+
         <div class="section-title" style="margin-top: 15px;"><h3>保存位置</h3><span class="saved-indicator" id="outputHint">默认保存到源文件目录</span></div>
         <div class="output-modes">
           <button class="output-card active" data-mode="source" type="button">
@@ -544,6 +597,7 @@
           </button>
         </div>
         <div class="output-extra" id="sourceExtra">
+          <label class="output-extra-label" for="suffixInput">文件名后缀</label>
           <input id="suffixInput" type="text" placeholder="文件名后缀" autocomplete="off" spellcheck="false">
         </div>
         <div class="output-extra" id="customExtra" hidden>
@@ -589,13 +643,76 @@
         <div class="log-box" id="logBox" hidden></div>
         <div class="results" id="results"></div>
       </section>
-
-      <footer class="foot">
-        <span class="paths" id="pathsText">配置目录加载中…</span>
-        <button class="quit-btn" id="quitBtn" type="button">退出工具</button>
-      </footer>
     </div>
   </main>
+
+  <main class="layout provider-layout" id="view-provider" hidden>
+    <section class="panel provider-list-panel" aria-label="提供商列表">
+      <div class="panel-head">
+        <h2>提供商 <span class="count" id="providerCount">0</span></h2>
+        <button class="link-btn" id="newProviderBtn" type="button">＋ 新建</button>
+      </div>
+      <div class="provider-list" id="providerList" role="listbox" aria-label="已保存的提供商"></div>
+      <div class="provider-preset">
+        <select id="presetSelect" aria-label="从预设添加"></select>
+        <button class="btn secondary small" id="presetBtn" type="button">添加</button>
+      </div>
+      <p class="provider-note">保存并启用后会立即更新 <code>.env</code>；正在运行的任务不受影响。</p>
+    </section>
+
+    <section class="panel provider-editor" aria-label="提供商设置">
+      <div class="section-title">
+        <h3 id="providerEditorTitle">新建提供商</h3>
+        <span class="saved-indicator" id="providerBadge">—</span>
+      </div>
+
+      <div class="field-grid">
+        <div class="field">
+          <label for="provName">显示名称</label>
+          <input id="provName" type="text" maxlength="80" placeholder="例如 DeepSeek" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label for="provId">提供商标识</label>
+          <input id="provId" type="text" readonly tabindex="-1" placeholder="保存后自动生成">
+        </div>
+        <div class="field full">
+          <label for="provBaseUrl">接口地址 <span class="hint">OpenAI 兼容地址，通常以 /v1 结尾</span></label>
+          <input id="provBaseUrl" type="url" placeholder="https://api.example.com/v1" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field full">
+          <label for="provModel">模型名称</label>
+          <input id="provModel" type="text" placeholder="deepseek-flash" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field full">
+          <label for="provApiKey">API Key <span class="hint" id="provKeyHint">仅保存在本机，不会上传</span></label>
+          <div class="key-row">
+            <input id="provApiKey" type="password" placeholder="sk-…" autocomplete="new-password" spellcheck="false">
+            <button class="btn secondary small" id="toggleProvKey" type="button">显示</button>
+          </div>
+        </div>
+      </div>
+
+      <label class="check-card" style="margin-top: 12px; cursor: default;">
+        <input id="provRequiresKey" type="checkbox" checked>
+        <span><strong>该服务需要 API Key</strong><span>本地或自建的兼容服务可以取消勾选</span></span>
+      </label>
+
+      <div class="test-result" id="provTestResult" hidden></div>
+
+      <div class="provider-actions">
+        <button class="btn secondary" id="provTestBtn" type="button">测试连接</button>
+        <button class="btn secondary danger" id="provDeleteBtn" type="button">删除</button>
+        <span class="spacer"></span>
+        <button class="btn secondary" id="provSaveBtn" type="button">仅保存</button>
+        <button class="btn primary" id="provSaveActivateBtn" type="button">保存并启用</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span class="paths" id="pathsText">配置目录加载中…</span>
+    <button class="quit-btn" id="quitBtn" type="button">退出工具</button>
+  </footer>
 </div>
 
 <div class="drop-overlay" id="dropOverlay" aria-hidden="true">
@@ -610,7 +727,7 @@
 <div class="fatal" id="fatal" hidden>
   <div class="fatal-card">
     <h2>无法打开配置工具</h2>
-    <p id="fatalMessage">请重新双击 aitrans.command 启动。</p>
+    <p id="fatalMessage">请重新双击 launchers/aitrans.command 启动。</p>
   </div>
 </div>
 
@@ -623,7 +740,30 @@
   const $$ = (selector) => [...document.querySelectorAll(selector)];
 
   const els = {
-    providerLink: $("#providerLink"),
+    tabTranslate: $("#tabTranslate"),
+    tabProvider: $("#tabProvider"),
+    viewTranslate: $("#view-translate"),
+    viewProvider: $("#view-provider"),
+    providerCount: $("#providerCount"),
+    providerList: $("#providerList"),
+    newProviderBtn: $("#newProviderBtn"),
+    presetSelect: $("#presetSelect"),
+    presetBtn: $("#presetBtn"),
+    providerEditorTitle: $("#providerEditorTitle"),
+    providerBadge: $("#providerBadge"),
+    provName: $("#provName"),
+    provId: $("#provId"),
+    provBaseUrl: $("#provBaseUrl"),
+    provModel: $("#provModel"),
+    provApiKey: $("#provApiKey"),
+    provKeyHint: $("#provKeyHint"),
+    toggleProvKey: $("#toggleProvKey"),
+    provRequiresKey: $("#provRequiresKey"),
+    provTestResult: $("#provTestResult"),
+    provTestBtn: $("#provTestBtn"),
+    provDeleteBtn: $("#provDeleteBtn"),
+    provSaveBtn: $("#provSaveBtn"),
+    provSaveActivateBtn: $("#provSaveActivateBtn"),
     quickProvider: $("#quickProvider"),
     fileCount: $("#fileCount"),
     clearFilesBtn: $("#clearFilesBtn"),
@@ -649,6 +789,9 @@
     modelInput: $("#modelInput"),
     modelHint: $("#modelHint"),
     ollamaModels: $("#ollamaModels"),
+    workersInput: $("#workersInput"),
+    retriesInput: $("#retriesInput"),
+    workersHint: $("#workersHint"),
     outputHint: $("#outputHint"),
     sourceExtra: $("#sourceExtra"),
     suffixInput: $("#suffixInput"),
@@ -689,6 +832,11 @@
   let dragDepth = 0;
   let toastTimer = null;
   let writtenJobId = null;
+  let providerDraft = null;
+  let providerDirty = false;
+  let providerBusy = false;
+  let selectedProviderId = null;
+  let keyVisible = false;
   const dirHandles = new Map();
   const savedBack = new Set();
 
@@ -781,6 +929,7 @@
     renderFiles();
     renderSettings();
     renderJob();
+    renderProviderTab();
     els.pathsText.textContent = `${translate.paths && translate.paths.home || ""} · settings.json + providers.json`;
     els.pathsText.title = els.pathsText.textContent;
     if (translate.settings_from_file) {
@@ -800,12 +949,14 @@
     renderFiles();
     renderSettings();
     renderJob();
+    renderProviderTab();
   }
 
   function applyProviderState(next) {
     state = next;
     renderProviderSelect();
     renderEngine();
+    renderProviderTab();
   }
 
   // ---------- 提供商 ----------
@@ -838,7 +989,7 @@
     const provider = providerById(providerId);
     if (!provider) return;
     if (provider.requires_key && !provider.api_key) {
-      showToast("该提供商还没有 API Key，请先到「提供商」页面填写。", "warning", 5000);
+      showToast("该提供商还没有 API Key，请先到「提供商」标签页填写。", "warning", 5000);
       renderProviderSelect();
       return;
     }
@@ -866,6 +1017,322 @@
     } finally {
       setBusy(false);
     }
+  }
+
+  // ---------- 提供商标签页 ----------
+
+  function clampInt(value, fallback, low, high) {
+    const number = Number.parseInt(value, 10);
+    if (!Number.isFinite(number)) return fallback;
+    return Math.max(low, Math.min(high, number));
+  }
+
+  function providerHost(rawUrl) {
+    try {
+      const parsed = new URL(rawUrl);
+      return parsed.host + parsed.pathname.replace(/\/$/, "");
+    } catch {
+      return rawUrl || "";
+    }
+  }
+
+  function setTab(tab, options = {}) {
+    const provider = tab === "provider";
+    els.viewTranslate.hidden = provider;
+    els.viewProvider.hidden = !provider;
+    els.tabTranslate.classList.toggle("active", !provider);
+    els.tabProvider.classList.toggle("active", provider);
+    if (options.updateHash !== false) {
+      const hash = provider ? "#provider" : "#translate";
+      if (location.hash !== hash) history.replaceState(null, "", hash);
+    }
+    if (provider) renderProviderTab();
+  }
+
+  function markProviderDirty() {
+    providerDirty = true;
+    updateProviderChrome();
+  }
+
+  function updateProviderChrome() {
+    if (!providerDraft) return;
+    const active = state && state.active;
+    const exists = Boolean(providerDraft.id);
+    els.providerEditorTitle.textContent = exists ? "编辑提供商" : "新建提供商";
+    els.provId.value = exists ? providerDraft.id : "保存后自动生成";
+    els.provDeleteBtn.disabled = !exists || providerBusy;
+    els.provSaveBtn.disabled = providerBusy;
+    els.provSaveActivateBtn.disabled = providerBusy;
+    els.provTestBtn.disabled = providerBusy;
+    els.provSaveActivateBtn.textContent =
+      exists && active === providerDraft.id ? "保存并同步 .env" : "保存并启用";
+    if (providerBusy) {
+      els.providerBadge.textContent = "处理中…";
+      els.providerBadge.className = "saved-indicator";
+    } else if (providerDirty) {
+      els.providerBadge.textContent = "有未保存的更改";
+      els.providerBadge.className = "saved-indicator";
+    } else if (exists && active === providerDraft.id) {
+      els.providerBadge.textContent = "当前启用";
+      els.providerBadge.className = "saved-indicator ok";
+    } else if (exists) {
+      els.providerBadge.textContent = "已保存";
+      els.providerBadge.className = "saved-indicator";
+    } else {
+      els.providerBadge.textContent = "未保存";
+      els.providerBadge.className = "saved-indicator";
+    }
+  }
+
+  function fillProviderForm(draft) {
+    els.provName.value = draft.name || "";
+    els.provBaseUrl.value = draft.base_url || "";
+    els.provModel.value = draft.model || "";
+    els.provApiKey.value = draft.api_key || "";
+    els.provRequiresKey.checked = draft.requires_key !== false;
+    els.provKeyHint.textContent = draft.id
+      ? "已保存在本机，可直接修改"
+      : "仅保存在本机，不会上传";
+    els.provTestResult.hidden = true;
+    updateProviderChrome();
+  }
+
+  function selectProviderForEdit(id, options = {}) {
+    if (!state) return;
+    if (!options.force && providerDirty && !window.confirm("当前修改尚未保存，切换后将丢失。继续吗？")) {
+      return;
+    }
+    const provider = (state.providers || []).find((item) => item.id === id);
+    if (!provider) return;
+    selectedProviderId = provider.id;
+    providerDraft = {
+      id: provider.id,
+      name: provider.name,
+      base_url: provider.base_url,
+      model: provider.model,
+      api_key: provider.api_key || "",
+      requires_key: provider.requires_key !== false,
+    };
+    providerDirty = false;
+    fillProviderForm(providerDraft);
+    renderProviderList();
+    if (options.focus !== false) els.provName.focus();
+  }
+
+  function startNewProvider(options = {}) {
+    if (!options.force && providerDirty && !window.confirm("当前修改尚未保存，新建后将丢失。继续吗？")) {
+      return;
+    }
+    selectedProviderId = null;
+    providerDraft = {
+      id: "",
+      name: "",
+      base_url: "",
+      model: "",
+      api_key: "",
+      requires_key: true,
+    };
+    providerDirty = false;
+    fillProviderForm(providerDraft);
+    renderProviderList();
+    if (options.focus !== false) els.provName.focus();
+  }
+
+  function renderProviderList() {
+    const providers = (state && state.providers) || [];
+    els.providerCount.textContent = String(providers.length);
+    els.providerList.innerHTML = "";
+    if (!providers.length) {
+      const empty = document.createElement("div");
+      empty.className = "provider-empty";
+      empty.textContent = "还没有保存的提供商。可以从下方预设添加，或点击「新建」。";
+      els.providerList.append(empty);
+      return;
+    }
+    for (const provider of providers) {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "provider-item" + (provider.id === selectedProviderId ? " selected" : "");
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", provider.id === selectedProviderId ? "true" : "false");
+
+      const top = document.createElement("div");
+      top.className = "provider-top";
+      const name = document.createElement("span");
+      name.className = "provider-name";
+      name.textContent = provider.name;
+      top.append(name);
+      if (state && state.active === provider.id) {
+        const pill = document.createElement("span");
+        pill.className = "provider-pill";
+        pill.textContent = "当前";
+        top.append(pill);
+      }
+
+      const meta = document.createElement("div");
+      meta.className = "provider-meta";
+      const model = document.createElement("span");
+      model.textContent = provider.model || "未设置模型";
+      meta.append(model);
+      if (provider.requires_key && !provider.api_key) {
+        const warn = document.createElement("span");
+        warn.className = "key-warning";
+        warn.textContent = "缺少 Key";
+        meta.append(warn);
+      }
+
+      const host = document.createElement("div");
+      host.className = "provider-host";
+      host.textContent = providerHost(provider.base_url);
+
+      item.append(top, meta, host);
+      item.addEventListener("click", () => selectProviderForEdit(provider.id));
+      els.providerList.append(item);
+    }
+  }
+
+  function renderPresetOptions() {
+    const presets = (state && state.presets) || [];
+    const previous = els.presetSelect.value;
+    els.presetSelect.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "从预设添加…";
+    els.presetSelect.append(placeholder);
+    for (const preset of presets) {
+      const option = document.createElement("option");
+      option.value = preset.id;
+      option.textContent = `${preset.name} · ${preset.model}`;
+      els.presetSelect.append(option);
+    }
+    if (presets.some((preset) => preset.id === previous)) els.presetSelect.value = previous;
+    els.presetBtn.disabled = !els.presetSelect.value;
+  }
+
+  function renderProviderTab() {
+    if (!state) return;
+    renderProviderList();
+    renderPresetOptions();
+    if (!providerDraft) {
+      const providers = (state && state.providers) || [];
+      if (providers.length) {
+        const activeId = state && state.active;
+        const target = providers.find((item) => item.id === activeId) || providers[0];
+        selectProviderForEdit(target.id, { force: true, focus: false });
+      } else {
+        startNewProvider({ force: true, focus: false });
+      }
+    } else {
+      updateProviderChrome();
+    }
+  }
+
+  function collectProviderForm() {
+    return {
+      id: providerDraft && providerDraft.id ? providerDraft.id : "",
+      name: els.provName.value.trim(),
+      base_url: els.provBaseUrl.value.trim(),
+      model: els.provModel.value.trim(),
+      api_key: els.provApiKey.value.trim(),
+      requires_key: els.provRequiresKey.checked,
+    };
+  }
+
+  function showProviderTest(result) {
+    const level =
+      result && result.level === "success"
+        ? "ok"
+        : result && result.level === "warning"
+          ? "warn"
+          : "error";
+    els.provTestResult.className = `test-result ${level}`;
+    els.provTestResult.textContent = (result && result.message) || "测试完成。";
+    els.provTestResult.hidden = false;
+  }
+
+  async function saveProvider(activate) {
+    if (!providerDraft || providerBusy) return;
+    const provider = collectProviderForm();
+    if (!provider.name) {
+      showToast("请填写显示名称。", "warning");
+      els.provName.focus();
+      return;
+    }
+    providerBusy = true;
+    updateProviderChrome();
+    try {
+      const data = await api("/api/providers", {
+        method: "POST",
+        body: { provider, activate: Boolean(activate) },
+      });
+      applyState(data.state);
+      providerDirty = false;
+      const savedId = data.saved_id;
+      if (savedId) selectProviderForEdit(savedId, { force: true, focus: false });
+      showToast(activate ? "已保存并启用" : "已保存", "success");
+    } catch (error) {
+      showToast(error.message, "error", 6000);
+    } finally {
+      providerBusy = false;
+      updateProviderChrome();
+    }
+  }
+
+  async function testProviderConnection() {
+    if (providerBusy) return;
+    const provider = collectProviderForm();
+    if (!provider.base_url) {
+      showToast("请先填写接口地址。", "warning");
+      return;
+    }
+    providerBusy = true;
+    updateProviderChrome();
+    try {
+      const data = await api("/api/test", { method: "POST", body: { provider } });
+      showProviderTest(data.test);
+    } catch (error) {
+      showProviderTest({ level: "error", message: error.message });
+    } finally {
+      providerBusy = false;
+      updateProviderChrome();
+    }
+  }
+
+  async function deleteProvider() {
+    if (!providerDraft || !providerDraft.id || providerBusy) return;
+    const provider = (state.providers || []).find((item) => item.id === providerDraft.id);
+    const name = provider ? provider.name : providerDraft.name;
+    if (!window.confirm(`确定删除提供商「${name}」吗？`)) return;
+    providerBusy = true;
+    updateProviderChrome();
+    try {
+      const data = await api("/api/delete", { method: "POST", body: { id: providerDraft.id } });
+      providerDraft = null;
+      selectedProviderId = null;
+      providerDirty = false;
+      applyState(data.state);
+      renderProviderTab();
+      showToast("已删除", "success");
+    } catch (error) {
+      showToast(error.message, "error", 6000);
+    } finally {
+      providerBusy = false;
+      updateProviderChrome();
+    }
+  }
+
+  function applyPreset() {
+    const presetId = els.presetSelect.value;
+    const preset = ((state && state.presets) || []).find((item) => item.id === presetId);
+    if (!preset) return;
+    if (!providerDraft) startNewProvider({ force: true, focus: false });
+    providerDraft.name = preset.name;
+    providerDraft.base_url = preset.base_url;
+    providerDraft.model = preset.model;
+    providerDraft.requires_key = preset.requires_key !== false;
+    providerDirty = true;
+    fillProviderForm(providerDraft);
+    els.provApiKey.focus();
   }
 
   // ---------- 引擎 / 设置 ----------
@@ -923,6 +1390,15 @@
       els.modelInput.value = backendModel();
     }
 
+    const backend = settings.backend === "ollama" ? "ollama" : "api";
+    if (document.activeElement !== els.workersInput) {
+      els.workersInput.value = settings[`${backend}_workers`] ?? (backend === "api" ? 20 : 2);
+    }
+    if (document.activeElement !== els.retriesInput) {
+      els.retriesInput.value = settings[`${backend}_retries`] ?? (backend === "api" ? 2 : 1);
+    }
+    els.workersHint.textContent = backend === "api" ? "API 同时请求数" : "本地模型建议 1–4";
+
     for (const card of $$(".output-card")) {
       card.classList.toggle("active", card.dataset.mode === (settings.output_mode || "source"));
     }
@@ -977,6 +1453,18 @@
     const model = els.modelInput.value.trim();
     if (backend === "api") settings.api_model = model;
     else settings.ollama_model = model;
+    settings[`${backend}_workers`] = clampInt(
+      els.workersInput.value,
+      backend === "api" ? 20 : 2,
+      1,
+      64,
+    );
+    settings[`${backend}_retries`] = clampInt(
+      els.retriesInput.value,
+      backend === "api" ? 2 : 1,
+      0,
+      5,
+    );
     settings.lang = els.langSelect.value;
     settings.translate = els.translateCheck.checked;
     settings.polish = els.polishCheck.checked;
@@ -1016,8 +1504,22 @@
 
   function switchBackend(backend) {
     if (!settings || settings.backend === backend) return;
+    const current = settings.backend === "ollama" ? "ollama" : "api";
+    settings[`${current}_workers`] = clampInt(
+      els.workersInput.value,
+      current === "api" ? 20 : 2,
+      1,
+      64,
+    );
+    settings[`${current}_retries`] = clampInt(
+      els.retriesInput.value,
+      current === "api" ? 2 : 1,
+      0,
+      5,
+    );
     settings.backend = backend;
     renderEngine();
+    renderSettings();
     scheduleSave();
   }
 
@@ -1579,6 +2081,45 @@
   // ---------- 事件 ----------
 
   els.quickProvider.addEventListener("change", () => changeProvider(els.quickProvider.value));
+  els.tabTranslate.addEventListener("click", (event) => {
+    event.preventDefault();
+    setTab("translate");
+  });
+  els.tabProvider.addEventListener("click", (event) => {
+    event.preventDefault();
+    setTab("provider");
+  });
+  window.addEventListener("hashchange", () => {
+    setTab(location.hash === "#provider" ? "provider" : "translate", { updateHash: false });
+  });
+  els.newProviderBtn.addEventListener("click", () => startNewProvider());
+  els.presetSelect.addEventListener("change", () => {
+    els.presetBtn.disabled = !els.presetSelect.value;
+  });
+  els.presetBtn.addEventListener("click", applyPreset);
+  els.provSaveBtn.addEventListener("click", () => saveProvider(false));
+  els.provSaveActivateBtn.addEventListener("click", () => saveProvider(true));
+  els.provTestBtn.addEventListener("click", testProviderConnection);
+  els.provDeleteBtn.addEventListener("click", deleteProvider);
+  els.toggleProvKey.addEventListener("click", () => {
+    keyVisible = !keyVisible;
+    els.provApiKey.type = keyVisible ? "text" : "password";
+    els.toggleProvKey.textContent = keyVisible ? "隐藏" : "显示";
+  });
+  for (const field of [els.provName, els.provBaseUrl, els.provModel, els.provApiKey, els.provRequiresKey]) {
+    field.addEventListener("input", markProviderDirty);
+    field.addEventListener("change", markProviderDirty);
+  }
+  els.workersInput.addEventListener("change", () => {
+    const backend = settings && settings.backend === "ollama" ? "ollama" : "api";
+    els.workersInput.value = clampInt(els.workersInput.value, backend === "api" ? 20 : 2, 1, 64);
+    scheduleSave();
+  });
+  els.retriesInput.addEventListener("change", () => {
+    const backend = settings && settings.backend === "ollama" ? "ollama" : "api";
+    els.retriesInput.value = clampInt(els.retriesInput.value, backend === "api" ? 2 : 1, 0, 5);
+    scheduleSave();
+  });
   els.apiEngine.addEventListener("click", () => switchBackend("api"));
   els.ollamaEngine.addEventListener("click", () => switchBackend("ollama"));
   els.pickFilesBtn.addEventListener("click", () => pick("files"));
@@ -1710,7 +2251,7 @@
   });
 
   async function init() {
-    els.providerLink.href = `/provider?token=${encodeURIComponent(TOKEN)}`;
+    setTab(location.hash === "#provider" ? "provider" : "translate", { updateHash: false });
     try {
       const data = await api("/api/state");
       applyState(data.state);

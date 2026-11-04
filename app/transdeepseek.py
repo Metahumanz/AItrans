@@ -26,9 +26,9 @@ from provider_config import (
 )
 
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-ORI_DIR = SCRIPT_DIR / "ori"
-OUTPUT_DIR = SCRIPT_DIR / "output"
+ROOT = Path(__file__).resolve().parent.parent
+ORI_DIR = ROOT / "ori"
+OUTPUT_DIR = ROOT / "output"
 DEFAULT_TRANSLATE_WORKERS = 50
 
 

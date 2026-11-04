@@ -3,6 +3,7 @@ import argparse
 import os
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from pathlib import Path
@@ -12,8 +13,27 @@ from tqdm import tqdm
 
 from translation_paths import collect_srt_files, prepare_outputs, read_text_file
 
+ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_WORKERS = 1
+DEFAULT_RETRIES = 1
 
-def translate_file(srt_path, model_name, lang="zh"):
+
+def _ollama_chat(messages, model_name, retries):
+    """调用 Ollama；网络错误时按指数退避重试。"""
+    attempt = 0
+    while True:
+        try:
+            return ollama.chat(model=model_name, messages=messages)
+        except Exception as error:
+            if attempt >= retries:
+                raise
+            delay = min(2 ** attempt, 8)
+            tqdm.write(f"  请求失败，{delay}秒后重试 ({attempt + 1}/{retries}): {error}")
+            time.sleep(delay)
+            attempt += 1
+
+
+def translate_file(srt_path, model_name, lang="zh", workers=DEFAULT_WORKERS, retries=DEFAULT_RETRIES):
     """第一阶段：翻译整个 SRT 文件，返回字幕块。"""
     srt_content = read_text_file(srt_path)
 
@@ -26,18 +46,22 @@ def translate_file(srt_path, model_name, lang="zh"):
     )
     lang_display = {"zh": "中文", "en": "英文", "ja": "日文", "ko": "韩文"}.get(lang, "中文")
 
-    parsed = []
+    parsed = [None] * len(blocks)
+    tasks = []
+    for index, block in enumerate(blocks):
+        lines = block.splitlines()
+        if len(lines) < 3:
+            parsed[index] = {"raw": block, "valid": False}
+            progress_bar.update(1)
+            continue
+        tasks.append((index, block, lines))
+
     success = 0
     errors = 0
     start_time = time.time()
 
-    for block in blocks:
-        lines = block.splitlines()
-        if len(lines) < 3:
-            parsed.append({"raw": block, "valid": False})
-            progress_bar.update(1)
-            continue
-
+    def translate_task(task):
+        index, block, lines = task
         index_line = lines[0]
         time_line = lines[1]
         original_text = "\n".join(lines[2:])
@@ -45,38 +69,36 @@ def translate_file(srt_path, model_name, lang="zh"):
             f'"{original_text}" 翻译为{lang_display}，只给我翻译的结果，'
             "不要加入其他任何内容，按照最佳翻译输出"
         )
-
         try:
-            response = ollama.chat(
-                model=model_name,
-                messages=[{"role": "user", "content": prompt}],
+            response = _ollama_chat(
+                [{"role": "user", "content": prompt}], model_name, retries
             )
             translated_text = re.sub(r'^"|"$', "", response["message"]["content"].strip())
-            parsed.append(
-                {
-                    "valid": True,
-                    "index": index_line,
-                    "timeline": time_line,
-                    "original": original_text,
-                    "translated": translated_text,
-                }
-            )
-            success += 1
-            progress_bar.set_postfix({"成功": success, "错误": errors})
-        except Exception:
-            parsed.append(
-                {
-                    "valid": True,
-                    "index": index_line,
-                    "timeline": time_line,
-                    "original": original_text,
-                    "translated": original_text,
-                }
-            )
-            errors += 1
-            progress_bar.set_postfix({"成功": success, "错误": errors})
+            return index, {
+                "valid": True,
+                "index": index_line,
+                "timeline": time_line,
+                "original": original_text,
+                "translated": translated_text,
+            }, None
+        except Exception as error:
+            return index, {
+                "valid": True,
+                "index": index_line,
+                "timeline": time_line,
+                "original": original_text,
+                "translated": original_text,
+            }, error
 
-        progress_bar.update(1)
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as executor:
+        for index, block, error in executor.map(translate_task, tasks):
+            parsed[index] = block
+            if error is None:
+                success += 1
+            else:
+                errors += 1
+            progress_bar.set_postfix({"成功": success, "错误": errors})
+            progress_bar.update(1)
 
     progress_bar.close()
     print(f"  翻译完成: {success}成功 / {errors}失败, 耗时{time.time() - start_time:.1f}秒")
@@ -118,7 +140,7 @@ def parse_batch_result(result_text, batch_indices):
     return optimized_map
 
 
-def optimize_translations(parsed_blocks, model_name, batch_size=8):
+def optimize_translations(parsed_blocks, model_name, batch_size=8, retries=DEFAULT_RETRIES):
     """第二阶段：批量润色译文，带上下文感知。"""
     valid_indices = [index for index, block in enumerate(parsed_blocks) if block["valid"]]
     if not valid_indices:
@@ -169,12 +191,13 @@ def optimize_translations(parsed_blocks, model_name, batch_size=8):
             )
 
         try:
-            response = ollama.chat(
-                model=model_name,
-                messages=[
+            response = _ollama_chat(
+                [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
+                model_name,
+                retries,
             )
             optimized_map = parse_batch_result(response["message"]["content"], batch_indices)
             batch_ok = 0
@@ -227,10 +250,12 @@ def process_folder(
     output_dir=None,
     save_to_source=False,
     suffix="_translated",
+    workers=DEFAULT_WORKERS,
+    retries=DEFAULT_RETRIES,
 ):
     """处理指定文件/文件夹中的所有 SRT 文件：先翻译再润色。"""
-    source_files = collect_srt_files(inputs, "ori")
-    output_root = Path(output_dir) if output_dir else Path("output")
+    source_files = collect_srt_files(inputs, ROOT / "ori")
+    output_root = Path(output_dir) if output_dir else ROOT / "output"
     if not save_to_source:
         output_root.mkdir(parents=True, exist_ok=True)
     pairs = prepare_outputs(
@@ -265,8 +290,8 @@ def process_folder(
         print(f"处理文件: {source.name} ({source.stat().st_size / 1024:.1f} KB)")
         print(f"输出到: {output_path}")
         print(f"{'=' * 60}")
-        parsed = translate_file(source, model_name, lang)
-        parsed = optimize_translations(parsed, model_name)
+        parsed = translate_file(source, model_name, lang, workers=workers, retries=retries)
+        parsed = optimize_translations(parsed, model_name, retries=retries)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(assemble_srt(parsed), encoding="utf-8", newline="\n")
 
@@ -299,6 +324,8 @@ def main():
         help="保存到每个源文件所在目录，文件名加后缀，不覆盖原文件",
     )
     parser.add_argument("--suffix", default="_translated", help="配合 --save-to-source 使用的文件名后缀（默认 _translated）")
+    parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS, help="翻译并发请求数（润色仍按批次串行）")
+    parser.add_argument("--retries", type=int, default=DEFAULT_RETRIES, help="网络错误或限流时的重试次数")
     args = parser.parse_args()
 
     source_display = ", ".join(args.input) if args.input else "ori"
@@ -308,6 +335,8 @@ def main():
     print(f"{'=' * 60}")
     print("字幕翻译+润色一体化工具")
     print(f"模型: {args.model}  目标语言: {args.lang}")
+    print(f"翻译并发: {args.workers}")
+    print(f"失败重试: {args.retries} 次")
     print(f"强制重译: {'是' if args.force else '否 (已存在结果自动跳过)'}")
     print(f"源文件: {source_display}")
     print(f"输出位置: {output_display}")
@@ -324,6 +353,8 @@ def main():
             output_dir=args.output_dir,
             save_to_source=args.save_to_source,
             suffix=args.suffix,
+            workers=args.workers,
+            retries=args.retries,
         )
     except Exception as error:
         print(f"\n发生错误: {error}")

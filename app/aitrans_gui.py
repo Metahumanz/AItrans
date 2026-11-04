@@ -34,13 +34,16 @@ from urllib.parse import parse_qs, quote, urlparse
 from urllib.request import urlopen
 
 import provider_config as pc
-import provider_gui as pg
+import provider_api as pa
 from translation_paths import PathError, collect_srt_files, output_path_for
+from web_base import GuiError, Handler as BaseHandler, localize_launcher_text
 
-HERE = Path(__file__).resolve().parent
-HTML_PATH = HERE / "aitrans_gui.html"
-SETTINGS_PATH = HERE / "settings.json"
-OUTPUT_DIR = HERE / "output"
+APP_DIR = Path(__file__).resolve().parent
+ROOT = APP_DIR.parent
+WEB_DIR = ROOT / "web"
+HTML_PATH = WEB_DIR / "index.html"
+SETTINGS_PATH = ROOT / "settings.json"
+OUTPUT_DIR = ROOT / "output"
 OLLAMA_URL = "http://127.0.0.1:11434/api/tags"
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 MAX_FILES = 200
@@ -71,10 +74,14 @@ DEFAULT_SETTINGS = {
     "suffix": "_translated",
     "custom_dir": "",
     "force": False,
+    "api_workers": 20,
+    "api_retries": 2,
+    "ollama_workers": 2,
+    "ollama_retries": 1,
 }
 
-
-GuiError = pg.GuiError
+WORKER_LIMITS = (1, 64)
+RETRY_LIMITS = (0, 5)
 
 
 class JobCanceled(Exception):
@@ -83,6 +90,15 @@ class JobCanceled(Exception):
 
 def _bool(value, default):
     return bool(value) if isinstance(value, bool) else default
+
+
+def _bounded_int(value, default, limits):
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    low, high = limits
+    return max(low, min(high, number))
 
 
 def _clean_settings(raw, current=None):
@@ -122,6 +138,19 @@ def _clean_settings(raw, current=None):
     custom_dir = raw.get("custom_dir", base.get("custom_dir", ""))
     if isinstance(custom_dir, str):
         base["custom_dir"] = custom_dir.strip()[:1000]
+
+    for key in ("api_workers", "ollama_workers"):
+        base[key] = _bounded_int(
+            raw.get(key, base.get(key)),
+            base.get(key, DEFAULT_SETTINGS[key]),
+            WORKER_LIMITS,
+        )
+    for key in ("api_retries", "ollama_retries"):
+        base[key] = _bounded_int(
+            raw.get(key, base.get(key)),
+            base.get(key, DEFAULT_SETTINGS[key]),
+            RETRY_LIMITS,
+        )
 
     base["version"] = 1
     return base
@@ -254,7 +283,7 @@ class App:
             if not isinstance(raw, str) or not raw.strip():
                 continue
             try:
-                found = collect_srt_files([raw], HERE / "ori")
+                found = collect_srt_files([raw], ROOT / "ori")
             except PathError as error:
                 raise GuiError(str(error)) from error
             for path in found:
@@ -410,7 +439,7 @@ class App:
                 "未检测到 Ollama。请先安装/启动 Ollama，或在设置中切换到 API 提供商。"
             )
 
-        log_path = HERE / ".ollama-gui.log"
+        log_path = ROOT / ".ollama-gui.log"
         if self.ollama_log is not None:
             try:
                 self.ollama_log.close()
@@ -418,7 +447,7 @@ class App:
                 pass
         self.ollama_log = open(log_path, "ab", buffering=0)
         popen_options = {
-            "cwd": str(HERE),
+            "cwd": str(ROOT),
             "stdout": self.ollama_log,
             "stderr": subprocess.STDOUT,
             "start_new_session": True,
@@ -610,14 +639,14 @@ class App:
 
         if importlib.util.find_spec("tqdm") is None:
             raise GuiError(
-                pg.localize_launcher_text(
-                    "缺少 tqdm 依赖，请通过 aitrans.command 启动以自动安装依赖。"
+                localize_launcher_text(
+                    "缺少 tqdm 依赖，请通过 launchers/aitrans.command 启动以自动安装依赖。"
                 )
             )
         if settings["backend"] == "ollama" and importlib.util.find_spec("ollama") is None:
             raise GuiError(
-                pg.localize_launcher_text(
-                    "缺少 ollama 依赖，请通过 aitrans.command 启动以自动安装依赖。"
+                localize_launcher_text(
+                    "缺少 ollama 依赖，请通过 launchers/aitrans.command 启动以自动安装依赖。"
                 )
             )
 
@@ -710,7 +739,7 @@ class App:
             command = [
                 sys.executable,
                 "-B",
-                str(HERE / script),
+                str(APP_DIR / script),
                 "--input",
                 str(source),
                 "--lang",
@@ -718,6 +747,26 @@ class App:
             ]
             if model:
                 command.extend(["--model", model])
+            if settings["backend"] == "api":
+                workers = settings["api_workers"]
+                retries = settings["api_retries"]
+            else:
+                workers = settings["ollama_workers"]
+                retries = settings["ollama_retries"]
+            if settings["backend"] == "api" and settings["polish"]:
+                # 翻译和润色阶段各有独立的并发参数。
+                command.extend(
+                    [
+                        "--translate-workers",
+                        str(workers),
+                        "--optimize-workers",
+                        str(workers),
+                        "--retries",
+                        str(retries),
+                    ]
+                )
+            else:
+                command.extend(["--workers", str(workers), "--retries", str(retries)])
             if settings["force"]:
                 command.append("--force")
             if item["mode"] in {"source", "temp"}:
@@ -736,7 +785,7 @@ class App:
             try:
                 process = subprocess.Popen(
                     command,
-                    cwd=str(HERE),
+                    cwd=str(ROOT),
                     env=environment,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
@@ -915,7 +964,7 @@ return output
         environment["PYTHONIOENCODING"] = "utf-8"
         try:
             result = subprocess.run(
-                [sys.executable, "-B", str(HERE / "windows_picker.py"), kind],
+                [sys.executable, "-B", str(APP_DIR / "windows_picker.py"), kind],
                 capture_output=True,
                 env=environment,
                 timeout=600,
@@ -988,7 +1037,7 @@ return output
     # ---------- 状态 / 退出 ----------
 
     def build_combined_state(self):
-        state = pg.build_state()
+        state = pa.build_state()
         settings = self.settings_snapshot()
         try:
             runtime = pc.resolve_runtime_config()
@@ -1022,7 +1071,7 @@ return output
             "job": self.job_snapshot(),
             "langs": [{"id": key, "name": value} for key, value in LANGS.items()],
             "paths": {
-                "home": str(HERE),
+                "home": str(ROOT),
                 "output": str(OUTPUT_DIR),
                 "settings": str(SETTINGS_PATH),
             },
@@ -1043,8 +1092,8 @@ return output
         shutil.rmtree(self.upload_root, ignore_errors=True)
 
 
-class Handler(pg.Handler):
-    server_version = "AItransGUI/1.0"
+class Handler(BaseHandler):
+    server_version = "AItransGUI/2.0"
 
     def _app(self):
         return self.server.app
@@ -1056,7 +1105,7 @@ class Handler(pg.Handler):
             self._send_text(500, f"找不到界面文件 {path.name}：{error}")
             return
         html = html.replace("__AITRANS_TOKEN__", self.server.token)
-        html = pg.localize_launcher_text(html)
+        html = localize_launcher_text(html)
         self._send_html(200, html)
 
     def do_GET(self):  # noqa: N802 - 匹配基类命名
@@ -1070,20 +1119,25 @@ class Handler(pg.Handler):
             if not self._token_ok():
                 self._send_text(
                     403,
-                    "链接无效或已过期。请重新双击 aitrans.command 启动。",
+                    "链接无效或已过期。请重新双击 launchers/aitrans.command 启动。",
                 )
                 return
             self._send_html_file(HTML_PATH)
             return
 
         if path == "/provider":
+            # 兼容旧书签：提供商已经合并到主界面，统一跳到对应标签页。
             if not self._token_ok():
                 self._send_text(
                     403,
-                    "链接无效或已过期。请重新双击 aitrans.command 启动。",
+                    "链接无效或已过期。请重新双击 launchers/aitrans.command 启动。",
                 )
                 return
-            self._send_html_file(pg.HTML_PATH)
+            token = (parse_qs(parsed.query).get("token") or [""])[0]
+            self.send_response(302)
+            self.send_header("Location", f"/?token={quote(token)}#provider")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
             return
 
         if path == "/favicon.ico":
@@ -1164,16 +1218,16 @@ class Handler(pg.Handler):
             payload = self._read_json()
 
             if path == "/api/providers":
-                result = pg.save_provider(payload)
+                result = pa.save_provider(payload)
                 result["state"] = app.build_combined_state()
             elif path == "/api/activate":
-                result = pg.activate_provider(payload)
+                result = pa.activate_provider(payload)
                 result["state"] = app.build_combined_state()
             elif path == "/api/delete":
-                result = pg.delete_provider(payload)
+                result = pa.delete_provider(payload)
                 result["state"] = app.build_combined_state()
             elif path == "/api/test":
-                result = {"test": pg.test_provider(payload.get("provider") or {})}
+                result = {"test": pa.test_provider(payload.get("provider") or {})}
             elif path == "/api/files":
                 app.add_paths(payload.get("paths"))
                 result = {"state": app.build_combined_state()}
@@ -1255,8 +1309,8 @@ def main(argv=None):
     server.daemon_threads = True
     server.token = secrets.token_urlsafe(24)
     server.app = app
-    route = "/provider" if args.tab == "provider" else "/"
-    url = f"http://127.0.0.1:{server.server_port}{route}?token={server.token}"
+    fragment = "#provider" if args.tab == "provider" else ""
+    url = f"http://127.0.0.1:{server.server_port}/?token={server.token}{fragment}"
 
     print("AItrans 统一图形界面")
     print(f"打开地址：{url}")

@@ -26,10 +26,12 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 HERE = Path(__file__).resolve().parent
-VENV_DIR = HERE / ".venv"
+ROOT = HERE.parent
+APP_DIR = ROOT / "app"
+VENV_DIR = ROOT / ".venv"
 VENV_PYTHON = VENV_DIR / "Scripts" / "python.exe"
 OLLAMA_URL = "http://127.0.0.1:11434/api/tags"
-OLLAMA_LOG = HERE / ".ollama-win.log"
+OLLAMA_LOG = ROOT / ".ollama-win.log"
 MIN_PYTHON = (3, 10)
 _VERSION_CHECK = (
     "import sys; raise SystemExit(0 if sys.version_info >= "
@@ -209,7 +211,7 @@ def start_ollama():
     try:
         process = subprocess.Popen(
             [str(executable), "serve"],
-            cwd=str(HERE),
+            cwd=str(ROOT),
             stdout=log,
             stderr=subprocess.STDOUT,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
@@ -271,6 +273,8 @@ def stop_ollama(process, log):
 
 def ensure_api_key():
     """确认当前提供商已配置 API Key，必要时提示输入并保存。"""
+    if str(APP_DIR) not in sys.path:
+        sys.path.insert(0, str(APP_DIR))
     try:
         from provider_config import get_api_key, resolve_runtime_config, set_active_api_key
     except Exception as error:  # pragma: no cover - 配置模块损坏时
@@ -320,8 +324,8 @@ def model_from_arguments(arguments):
 
 def run_script(python, script, arguments):
     return subprocess.call(
-        [str(python), "-B", str(HERE / script), *arguments],
-        cwd=str(HERE),
+        [str(python), "-B", str(APP_DIR / script), *arguments],
+        cwd=str(ROOT),
     )
 
 
@@ -343,7 +347,7 @@ def main(argv=None):
         print("错误：未知的启动模式。请通过文件夹中的 .bat 启动器运行。")
         return 2
 
-    os.chdir(HERE)
+    os.chdir(ROOT)
     try:
         python = ensure_venv()
         ensure_dependencies(python, spec["dependencies"])
@@ -361,8 +365,8 @@ def main(argv=None):
     if spec["backend"] == "gui":
         return run_script(python, script, prefix + passthrough)
 
-    (HERE / "ori").mkdir(exist_ok=True)
-    (HERE / "output").mkdir(exist_ok=True)
+    (ROOT / "ori").mkdir(exist_ok=True)
+    (ROOT / "output").mkdir(exist_ok=True)
 
     process = None
     log = None
