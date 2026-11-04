@@ -11,10 +11,34 @@ from __future__ import annotations
 from pathlib import Path
 
 SRT_SUFFIX = ".srt"
+# Windows 文件名不允许这些字符；统一在所有平台上拒绝，避免生成 ADS 文件
+# （例如 suffix="a:b" 在 Windows 上会写成 "影片a:b.srt" 的备用数据流）。
+INVALID_SUFFIX_CHARS = frozenset('<>:"/\\|?*')
 
 
 class PathError(ValueError):
     """输入或输出路径不合法。"""
+
+
+def validate_suffix(suffix):
+    """校验「保存到源文件目录」使用的文件名后缀，返回去掉首尾空白的结果。"""
+    clean = (suffix or "").strip()
+    if not clean:
+        raise PathError("保存到源文件目录时必须提供文件名后缀。")
+    bad = sorted(
+        {
+            char
+            for char in clean
+            if char in INVALID_SUFFIX_CHARS or ord(char) < 32
+        }
+    )
+    if bad:
+        shown = " ".join(repr(char) for char in bad)
+        raise PathError(
+            f"文件名后缀不能包含这些字符：{shown}。"
+            'Windows 文件名不允许 < > : " / \\ | ? * 和控制字符。'
+        )
+    return clean
 
 
 def read_text_file(path):
@@ -78,11 +102,7 @@ def output_path_for(source, output_dir=None, save_to_source=False, suffix="_tran
     source = Path(source)
 
     if save_to_source:
-        clean_suffix = (suffix or "").strip()
-        if not clean_suffix:
-            raise PathError("保存到源文件目录时必须提供文件名后缀。")
-        if "/" in clean_suffix or "\\" in clean_suffix:
-            raise PathError("文件名后缀不能包含路径分隔符。")
+        clean_suffix = validate_suffix(suffix)
         output = source.with_name(f"{source.stem}{clean_suffix}{source.suffix}")
     else:
         if output_dir is None:

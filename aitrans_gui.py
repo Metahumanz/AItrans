@@ -114,8 +114,9 @@ def _clean_settings(raw, current=None):
     suffix = raw.get("suffix", base.get("suffix", "_translated"))
     if isinstance(suffix, str):
         suffix = suffix.strip()
-        if not suffix or "/" in suffix or "\\" in suffix or len(suffix) > 40:
+        if not suffix or len(suffix) > 40:
             suffix = base.get("suffix") or "_translated"
+        # 非法字符在开始任务时由 validate_suffix 给出明确提示，这里只做长度保护。
         base["suffix"] = suffix
 
     custom_dir = raw.get("custom_dir", base.get("custom_dir", ""))
@@ -162,6 +163,21 @@ def _platform_name():
     if sys.platform == "darwin":
         return "macos"
     return "linux"
+
+
+def _relative_write_name(relative_name, file_name):
+    """把上传文件的相对路径换成新文件名，保留其所在子目录。
+
+    拖入文件夹时浏览器只给出 `子目录/文件名`，写回时必须沿用同样的目录，
+    但文件名要换成带后缀的输出名，避免覆盖原字幕。
+    """
+    parts = [
+        part
+        for part in str(relative_name or "").replace("\\", "/").split("/")
+        if part and part not in {".", ".."}
+    ]
+    parts[-1:] = [file_name]
+    return "/".join(parts) or file_name
 
 
 class App:
@@ -530,17 +546,32 @@ class App:
             source = Path(entry["path"])
             if not source.exists():
                 raise GuiError(f"源文件不存在：{source}")
+            write_name = None
             if entry["kind"] == "upload" and settings["output_mode"] == "source":
-                # 浏览器上传的文件没有原始绝对路径，先输出到临时目录，
-                # 由前端通过 File System Access API 写回拖入的文件夹。
-                output = self.upload_root / "outputs" / uuid.uuid4().hex / source.name
+                # 浏览器上传的文件没有原始绝对路径：像源目录模式一样在上传副本
+                # 旁边生成带后缀的结果，再由前端按同样的相对路径写回拖入的文件夹。
+                try:
+                    output = output_path_for(
+                        source,
+                        save_to_source=True,
+                        suffix=suffix,
+                    )
+                except PathError as error:
+                    raise GuiError(str(error)) from error
                 mode = "temp"
-            elif settings["output_mode"] == "source":
-                output = output_path_for(
-                    source,
-                    save_to_source=True,
-                    suffix=suffix,
+                write_name = _relative_write_name(
+                    entry.get("relative_name") or source.name,
+                    output.name,
                 )
+            elif settings["output_mode"] == "source":
+                try:
+                    output = output_path_for(
+                        source,
+                        save_to_source=True,
+                        suffix=suffix,
+                    )
+                except PathError as error:
+                    raise GuiError(str(error)) from error
                 mode = "source"
             elif settings["output_mode"] == "custom":
                 output = output_path_for(source, output_dir=custom_dir)
@@ -562,6 +593,7 @@ class App:
                     "source": str(source),
                     "output": str(output),
                     "mode": mode,
+                    "write_name": write_name,
                 }
             )
         return items
@@ -600,7 +632,10 @@ class App:
                     "请先在“提供商”中配置，或切换到 Ollama。"
                 )
 
-        items = self._build_items(settings)
+        try:
+            items = self._build_items(settings)
+        except PathError as error:
+            raise GuiError(str(error)) from error
         job = {
             "id": uuid.uuid4().hex,
             "status": "running",
@@ -685,7 +720,7 @@ class App:
                 command.extend(["--model", model])
             if settings["force"]:
                 command.append("--force")
-            if item["mode"] == "source":
+            if item["mode"] in {"source", "temp"}:
                 command.extend(["--save-to-source", "--suffix", settings["suffix"]])
             else:
                 command.extend(["--output-dir", str(output.parent)])
@@ -743,7 +778,9 @@ class App:
                 "status": status,
                 "message": message,
                 "batch_id": entry.get("batch_id"),
-                "relative_name": entry.get("relative_name") or output.name,
+                "relative_name": item.get("write_name")
+                or entry.get("relative_name")
+                or output.name,
                 "output_name": output.name,
             }
             if item["mode"] == "temp" and output.exists() and output.stat().st_size > 0:
