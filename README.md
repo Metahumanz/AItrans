@@ -60,7 +60,7 @@ dotnet build windows/AITrans.App/AITrans.App.csproj -c Release -p:Platform=x64
 
 - `spec/` 是提示词与规则**唯一**的事实来源，改动后运行 `python3 tools/gen_spec.py` 并提交生成物；CI 会校验是否最新。
 - `fixtures/` 由 `python3 tools/gen_fixtures.py` 调用 v1 实现生成，两端测试读取同一批样本；CI 会校验可重现。
-- 详细说明见 [docs/architecture.md](docs/architecture.md)、[docs/release.md](docs/release.md)、[docs/verification-windows.md](docs/verification-windows.md)。
+- 详细说明见 [docs/architecture.md](docs/architecture.md)、[docs/release.md](docs/release.md)，以及两端验收清单 [macOS](docs/verification-macos.md) / [Windows](docs/verification-windows.md)。
 
 ## v1 命令行（保留）
 
