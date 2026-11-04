@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Metahumanz/AItrans/spec/job.schema.json",
+  "title": "AItrans translation job",
+  "description": "新客户端内部的任务模型。与旧 Python 的 /api/state 无关，字段使用 camelCase。",
+  "type": "object",
+  "required": ["id", "status", "results"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["queued", "running", "done", "canceled", "failed"] },
+    "startedAt": { "type": ["string", "null"], "format": "date-time" },
+    "finishedAt": { "type": ["string", "null"], "format": "date-time" },
+    "results": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/result" }
+    }
+  },
+  "$defs": {
+    "result": {
+      "type": "object",
+      "required": ["name", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "relativeName": { "type": ["string", "null"] },
+        "status": { "enum": ["success", "skipped", "failed"] },
+        "outputPath": { "type": ["string", "null"] },
+        "error": { "type": ["string", "null"] },
+        "translatedCount": { "type": "integer", "minimum": 0 },
+        "errorCount": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

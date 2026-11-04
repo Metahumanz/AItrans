@@ -1,0 +1,11 @@
+﻿1
+00:00:01,000 --> 00:00:03,000
+Good morning, everyone.
+
+2
+00:00:03,500 --> 00:00:06,000
+Let's begin the meeting.
+
+3
+00:00:06,500 --> 00:00:09,000
+Thanks for coming.

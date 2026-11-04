@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Metahumanz/AItrans/spec/providers.schema.json",
+  "title": "AItrans provider store",
+  "type": "object",
+  "required": ["version", "providers"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "active": { "type": ["string", "null"] },
+    "providers": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/provider" }
+    }
+  },
+  "$defs": {
+    "provider": {
+      "type": "object",
+      "required": ["id", "name", "base_url", "model", "requires_key"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+        },
+        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "base_url": {
+          "type": "string",
+          "pattern": "^https?://",
+          "maxLength": 500
+        },
+        "model": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "api_key": { "type": "string", "maxLength": 1000 },
+        "requires_key": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -1,0 +1,179 @@
+{
+  "generatedBy": "tools/gen_fixtures.py",
+  "translatePrefix": "〔译〕",
+  "polishPrefix": "〔润〕",
+  "cases": {
+    "basic-utf8.srt": {
+      "blocks": [
+        {
+          "valid": true,
+          "raw": "1\n00:00:01,000 --> 00:00:03,000\nGood morning, everyone.",
+          "index": "1",
+          "timeline": "00:00:01,000 --> 00:00:03,000",
+          "original": "Good morning, everyone."
+        },
+        {
+          "valid": true,
+          "raw": "2\n00:00:03,500 --> 00:00:06,000\nLet's begin the meeting.",
+          "index": "2",
+          "timeline": "00:00:03,500 --> 00:00:06,000",
+          "original": "Let's begin the meeting."
+        },
+        {
+          "valid": true,
+          "raw": "3\n00:00:06,500 --> 00:00:09,000\nThanks for coming.",
+          "index": "3",
+          "timeline": "00:00:06,500 --> 00:00:09,000",
+          "original": "Thanks for coming."
+        }
+      ],
+      "translateOutput": "1\n00:00:01,000 --> 00:00:03,000\n〔译〕Good morning, everyone.\nGood morning, everyone.\n\n2\n00:00:03,500 --> 00:00:06,000\n〔译〕Let's begin the meeting.\nLet's begin the meeting.\n\n3\n00:00:06,500 --> 00:00:09,000\n〔译〕Thanks for coming.\nThanks for coming.",
+      "polishOutput": "1\n00:00:01,000 --> 00:00:03,000\n〔润〕〔译〕Good morning, everyone.\nGood morning, everyone.\n\n2\n00:00:03,500 --> 00:00:06,000\n〔润〕〔译〕Let's begin the meeting.\nLet's begin the meeting.\n\n3\n00:00:06,500 --> 00:00:09,000\n〔润〕〔译〕Thanks for coming.\nThanks for coming."
+    },
+    "crlf.srt": {
+      "blocks": [
+        {
+          "valid": true,
+          "raw": "1\r\n00:00:01,000 --> 00:00:03,000\r\nGood morning, everyone.",
+          "index": "1",
+          "timeline": "00:00:01,000 --> 00:00:03,000",
+          "original": "Good morning, everyone."
+        },
+        {
+          "valid": true,
+          "raw": "2\r\n00:00:03,500 --> 00:00:06,000\r\nLet's begin the meeting.",
+          "index": "2",
+          "timeline": "00:00:03,500 --> 00:00:06,000",
+          "original": "Let's begin the meeting."
+        },
+        {
+          "valid": true,
+          "raw": "3\r\n00:00:06,500 --> 00:00:09,000\r\nThanks for coming.",
+          "index": "3",
+          "timeline": "00:00:06,500 --> 00:00:09,000",
+          "original": "Thanks for coming."
+        }
+      ],
+      "translateOutput": "1\n00:00:01,000 --> 00:00:03,000\n〔译〕Good morning, everyone.\nGood morning, everyone.\n\n2\n00:00:03,500 --> 00:00:06,000\n〔译〕Let's begin the meeting.\nLet's begin the meeting.\n\n3\n00:00:06,500 --> 00:00:09,000\n〔译〕Thanks for coming.\nThanks for coming.",
+      "polishOutput": "1\n00:00:01,000 --> 00:00:03,000\n〔润〕〔译〕Good morning, everyone.\nGood morning, everyone.\n\n2\n00:00:03,500 --> 00:00:06,000\n〔润〕〔译〕Let's begin the meeting.\nLet's begin the meeting.\n\n3\n00:00:06,500 --> 00:00:09,000\n〔润〕〔译〕Thanks for coming.\nThanks for coming."
+    },
+    "utf8-bom.srt": {
+      "blocks": [
+        {
+          "valid": true,
+          "raw": "1\n00:00:01,000 --> 00:00:03,000\nGood morning, everyone.",
+          "index": "1",
+          "timeline": "00:00:01,000 --> 00:00:03,000",
+          "original": "Good morning, everyone."
+        },
+        {
+          "valid": true,
+          "raw": "2\n00:00:03,500 --> 00:00:06,000\nLet's begin the meeting.",
+          "index": "2",
+          "timeline": "00:00:03,500 --> 00:00:06,000",
+          "original": "Let's begin the meeting."
+        },
+        {
+          "valid": true,
+          "raw": "3\n00:00:06,500 --> 00:00:09,000\nThanks for coming.",
+          "index": "3",
+          "timeline": "00:00:06,500 --> 00:00:09,000",
+          "original": "Thanks for coming."
+        }
+      ],
+      "translateOutput": "1\n00:00:01,000 --> 00:00:03,000\n〔译〕Good morning, everyone.\nGood morning, everyone.\n\n2\n00:00:03,500 --> 00:00:06,000\n〔译〕Let's begin the meeting.\nLet's begin the meeting.\n\n3\n00:00:06,500 --> 00:00:09,000\n〔译〕Thanks for coming.\nThanks for coming.",
+      "polishOutput": "1\n00:00:01,000 --> 00:00:03,000\n〔润〕〔译〕Good morning, everyone.\nGood morning, everyone.\n\n2\n00:00:03,500 --> 00:00:06,000\n〔润〕〔译〕Let's begin the meeting.\nLet's begin the meeting.\n\n3\n00:00:06,500 --> 00:00:09,000\n〔润〕〔译〕Thanks for coming.\nThanks for coming."
+    },
+    "utf16le-bom.srt": {
+      "blocks": [
+        {
+          "valid": true,
+          "raw": "1\n00:00:01,000 --> 00:00:03,000\nGood morning, everyone.",
+          "index": "1",
+          "timeline": "00:00:01,000 --> 00:00:03,000",
+          "original": "Good morning, everyone."
+        },
+        {
+          "valid": true,
+          "raw": "2\n00:00:03,500 --> 00:00:06,000\nLet's begin the meeting.",
+          "index": "2",
+          "timeline": "00:00:03,500 --> 00:00:06,000",
+          "original": "Let's begin the meeting."
+        },
+        {
+          "valid": true,
+          "raw": "3\n00:00:06,500 --> 00:00:09,000\nThanks for coming.",
+          "index": "3",
+          "timeline": "00:00:06,500 --> 00:00:09,000",
+          "original": "Thanks for coming."
+        }
+      ],
+      "translateOutput": "1\n00:00:01,000 --> 00:00:03,000\n〔译〕Good morning, everyone.\nGood morning, everyone.\n\n2\n00:00:03,500 --> 00:00:06,000\n〔译〕Let's begin the meeting.\nLet's begin the meeting.\n\n3\n00:00:06,500 --> 00:00:09,000\n〔译〕Thanks for coming.\nThanks for coming.",
+      "polishOutput": "1\n00:00:01,000 --> 00:00:03,000\n〔润〕〔译〕Good morning, everyone.\nGood morning, everyone.\n\n2\n00:00:03,500 --> 00:00:06,000\n〔润〕〔译〕Let's begin the meeting.\nLet's begin the meeting.\n\n3\n00:00:06,500 --> 00:00:09,000\n〔润〕〔译〕Thanks for coming.\nThanks for coming."
+    },
+    "gbk.srt": {
+      "blocks": [
+        {
+          "valid": true,
+          "raw": "1\n00:00:01,000 --> 00:00:03,000\n早上好，各位。",
+          "index": "1",
+          "timeline": "00:00:01,000 --> 00:00:03,000",
+          "original": "早上好，各位。"
+        },
+        {
+          "valid": true,
+          "raw": "2\n00:00:03,500 --> 00:00:06,000\n我们开始会议吧。",
+          "index": "2",
+          "timeline": "00:00:03,500 --> 00:00:06,000",
+          "original": "我们开始会议吧。"
+        }
+      ],
+      "translateOutput": "1\n00:00:01,000 --> 00:00:03,000\n〔译〕早上好，各位。\n早上好，各位。\n\n2\n00:00:03,500 --> 00:00:06,000\n〔译〕我们开始会议吧。\n我们开始会议吧。",
+      "polishOutput": "1\n00:00:01,000 --> 00:00:03,000\n〔润〕〔译〕早上好，各位。\n早上好，各位。\n\n2\n00:00:03,500 --> 00:00:06,000\n〔润〕〔译〕我们开始会议吧。\n我们开始会议吧。"
+    },
+    "multiline.srt": {
+      "blocks": [
+        {
+          "valid": true,
+          "raw": "1\n00:00:01,000 --> 00:00:03,000\nGood morning, everyone.",
+          "index": "1",
+          "timeline": "00:00:01,000 --> 00:00:03,000",
+          "original": "Good morning, everyone."
+        },
+        {
+          "valid": true,
+          "raw": "2\n00:00:03,500 --> 00:00:07,000\nThis is a long line\nthat wraps.",
+          "index": "2",
+          "timeline": "00:00:03,500 --> 00:00:07,000",
+          "original": "This is a long line\nthat wraps."
+        },
+        {
+          "valid": true,
+          "raw": "3\n00:00:07,500 --> 00:00:09,000\nThanks for coming.",
+          "index": "3",
+          "timeline": "00:00:07,500 --> 00:00:09,000",
+          "original": "Thanks for coming."
+        }
+      ],
+      "translateOutput": "1\n00:00:01,000 --> 00:00:03,000\n〔译〕Good morning, everyone.\nGood morning, everyone.\n\n2\n00:00:03,500 --> 00:00:07,000\n〔译〕This is a long line\nthat wraps.\nThis is a long line\nthat wraps.\n\n3\n00:00:07,500 --> 00:00:09,000\n〔译〕Thanks for coming.\nThanks for coming.",
+      "polishOutput": "1\n00:00:01,000 --> 00:00:03,000\n〔润〕〔译〕Good morning, everyone.\nGood morning, everyone.\n\n2\n00:00:03,500 --> 00:00:07,000\n〔润〕〔译〕This is a long line\nthat wraps.\nThis is a long line\nthat wraps.\n\n3\n00:00:07,500 --> 00:00:09,000\n〔润〕〔译〕Thanks for coming.\nThanks for coming."
+    },
+    "malformed.srt": {
+      "blocks": [
+        {
+          "valid": true,
+          "raw": "1\n00:00:01,000 --> 00:00:02,000\nHello",
+          "index": "1",
+          "timeline": "00:00:01,000 --> 00:00:02,000",
+          "original": "Hello"
+        },
+        {
+          "raw": "2\n00:00:03,000 --> 00:00:04,000",
+          "valid": false
+        }
+      ],
+      "translateOutput": "1\n00:00:01,000 --> 00:00:02,000\n〔译〕Hello\nHello\n\n2\n00:00:03,000 --> 00:00:04,000",
+      "polishOutput": "1\n00:00:01,000 --> 00:00:02,000\n〔润〕〔译〕Hello\nHello\n\n2\n00:00:03,000 --> 00:00:04,000"
+    }
+  }
+}

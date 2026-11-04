@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    name: 工作流语法检查
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color
+
+  spec:
+    name: 契约与黄金样本
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装 legacy 依赖
+        run: python3 -m pip install --quiet tqdm
+
+      - name: spec 生成物是否最新
+        run: python3 tools/gen_spec.py --check
+
+      - name: 黄金样本是否可重现
+        run: |
+          TQDM_DISABLE=1 python3 tools/gen_fixtures.py
+          git diff --exit-code -- fixtures/
+
+  macos:
+    name: macOS 构建与测试
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Swift 版本
+        run: swift --version
+
+      - name: 测试
+        working-directory: macos
+        run: swift test --disable-sandbox
+
+      - name: 打包
+        run: ./macos/Scripts/package-app.sh 0.0.0-ci
+
+  windows:
+    name: Windows 构建与测试
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 检测 Windows 工程
+        id: detect
+        shell: bash
+        run: |
+          if [ -f windows/AITrans.Core.Tests/AITrans.Core.Tests.csproj ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "windows/ 尚未落地，跳过。"
+          fi
+          if [ -f windows/AITrans.App/AITrans.App.csproj ]; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "app=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-dotnet@v4
+        if: steps.detect.outputs.found == 'true'
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: 测试
+        if: steps.detect.outputs.found == 'true'
+        run: dotnet test windows/AITrans.Core.Tests/AITrans.Core.Tests.csproj -c Release
+
+      - name: 构建 WinUI 客户端
+        if: steps.detect.outputs.app == 'true'
+        run: dotnet build windows/AITrans.App/AITrans.App.csproj -c Release -p:Platform=x64
+
+      - name: 打包 zip（验证发布流程）
+        if: steps.detect.outputs.app == 'true'
+        shell: bash
+        working-directory: windows
+        run: |
+          dotnet publish AITrans.App/AITrans.App.csproj \
+            -c Release -r win-x64 --self-contained true \
+            -p:Version=0.0.0-ci -o dist/app
+          cd dist/app && 7z a -tzip "../AITrans-0.0.0-ci-win-x64.zip" . > /dev/null
+          ls -l ../*.zip
