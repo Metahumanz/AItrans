@@ -185,7 +185,7 @@ def main() -> int:
         "cases": cases,
     }
     out = EXPECTED_DIR / "srt.json"
-    out.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    out.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(f"wrote {out.relative_to(ROOT)}")
     return 0
 

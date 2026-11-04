@@ -252,7 +252,7 @@ def main(argv: list[str]) -> int:
             stale.append(path)
             continue
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
+        path.write_text(content, encoding="utf-8", newline="\n")
         print(f"wrote {path.relative_to(ROOT)}")
 
     if check and stale:

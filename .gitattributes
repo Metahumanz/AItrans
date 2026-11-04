@@ -5,3 +5,16 @@
 
 # Windows batch files are read by cmd.exe, which expects CRLF.
 *.bat     text eol=crlf
+
+# 黄金样本必须保持原始字节：其中包含 UTF-16/GBK 编码与 CRLF 样本，
+# 任何换行转换都会让跨平台测试产生假失败。
+fixtures/** -text
+
+# 生成物与源码统一 LF，保证 gen_spec --check 在任意平台结果一致。
+spec/**    text eol=lf
+tools/**   text eol=lf
+windows/** text eol=lf
+macos/**   text eol=lf
+
+# 批处理文件仍需 CRLF
+windows/**/*.bat text eol=crlf
