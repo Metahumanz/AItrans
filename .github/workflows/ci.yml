@@ -59,6 +59,11 @@ jobs:
             echo "found=false" >> "$GITHUB_OUTPUT"
             echo "windows/ 尚未落地，跳过。"
           fi
+          if [ -f windows/AITrans.App/AITrans.App.csproj ]; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "app=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/setup-dotnet@v4
         if: steps.detect.outputs.found == 'true'
@@ -68,3 +73,7 @@ jobs:
       - name: 测试
         if: steps.detect.outputs.found == 'true'
         run: dotnet test windows/AITrans.Core.Tests/AITrans.Core.Tests.csproj -c Release
+
+      - name: 构建 WinUI 客户端
+        if: steps.detect.outputs.app == 'true'
+        run: dotnet build windows/AITrans.App/AITrans.App.csproj -c Release -p:Platform=x64
