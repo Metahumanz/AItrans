@@ -434,7 +434,7 @@ def write_env_file(store, path=ENV_PATH):
 
     block = [ENV_HEADER]
     if active is None:
-        block.append("# 尚未选择模型提供商：请双击 aitrans.command 配置")
+        block.append(f"# 尚未选择模型提供商：请双击 {LAUNCHER_NAME} 配置")
     else:
         block.append(f"# 当前提供商：{active['name']}")
         block.append(f"AI_PROVIDER={_format_env_value(active['id'])}")
