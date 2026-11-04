@@ -30,6 +30,13 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/AITrans"
 chmod +x "$APP/Contents/MacOS/AITrans"
 
+ICON="$MACOS_DIR/../assets/icon/AppIcon.icns"
+if [ ! -f "$ICON" ]; then
+    echo "缺少图标：$ICON（先运行 python3 tools/gen_icon.py）" >&2
+    exit 1
+fi
+cp "$ICON" "$APP/Contents/Resources/AppIcon.icns"
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -39,6 +46,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <string>zh_CN</string>
     <key>CFBundleExecutable</key>
     <string>AITrans</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.metahumanz.aitrans</string>
     <key>CFBundleInfoDictionaryVersion</key>

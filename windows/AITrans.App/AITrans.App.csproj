@@ -14,7 +14,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>AITrans</AssemblyName>
-    <ApplicationIcon />
+    <ApplicationIcon>..\..\assets\icon\icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

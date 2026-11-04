@@ -75,3 +75,6 @@ windows/dist/
 
 # gh 日志缓存（受限环境用）
 /.cache-gh/
+
+# 图标生成的中间产物
+/assets/icon/AppIcon.iconset/

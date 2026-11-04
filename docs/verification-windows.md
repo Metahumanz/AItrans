@@ -1,96 +1,115 @@
-# Windows 端验证清单
+# Windows 端验收
 
-> 用途：你在 Windows 机器上验证时按此逐项勾选，把失败项连同日志反馈。
-> 状态：`windows/AITrans.Core` 与 WinUI 3 客户端均已落地，CI 能编译并打出 zip；尚未在真实 Windows 桌面上人工跑过，本清单就是待勾选的部分。
+分两部分：**自动化**（一条命令，覆盖绝大部分逻辑）与**人工**（只包含无法自动化的界面交互）。
 
-## 0. 环境
+## 一、自动化
 
-- [ ] Windows 10 1809+ 或 Windows 11
-- [ ] .NET SDK 10 已安装（`dotnet --version`）
-- [ ] 能访问 GitHub（或已配置代理）
-
-## 1. 构建
+### 准备
 
 ```bat
-dotnet test windows/AITrans.Core.Tests/AITrans.Core.Tests.csproj -c Release
-dotnet build windows/AITrans.App/AITrans.App.csproj -c Release -p:Platform=x64
-
-:: 生成可分发的 zip
-dotnet publish windows/AITrans.App/AITrans.App.csproj ^
-  -c Release -r win-x64 --self-contained true -p:Version=0.0.1 -o windows\dist\app
+git clone https://github.com/Metahumanz/AItrans.git
+cd AItrans
+git checkout main
 ```
 
-- [ ] 构建无错误
-- [ ] 单元测试全绿（与 macOS 同一批 `fixtures/`，当前 31 个）
-- [ ] `windows\dist\app\AITrans.exe` 能启动并显示主窗口
+需要 **.NET 10 SDK**（`dotnet --version` 应为 10.x）。
 
-## 2. 编码与解析
+### 运行
 
-用 `fixtures/srt/` 里的样本，或自备字幕：
+```bat
+powershell -ExecutionPolicy Bypass -File windows\scripts\verify.ps1
+```
 
-- [ ] UTF-8 正常
-- [ ] UTF-8 带 BOM 正常（首行不出现乱码字符）
-- [ ] UTF-16 LE 带 BOM 正常（记事本「Unicode」另存）
-- [ ] GBK / GB18030 中文正常
-- [ ] CRLF 换行正常
-- [ ] 多行字幕保持换行
-- [ ] 畸形块（缺正文）原样保留，不报错
+加 `-Publish` 会额外执行一次自包含发布，并检查 `AITrans.exe` 是否生成：
 
-## 3. 输出
+```bat
+powershell -ExecutionPolicy Bypass -File windows\scripts\verify.ps1 -Publish
+```
 
-- [ ] 源目录模式：生成 `原名_translated.srt`，不覆盖原文件
-- [ ] output 模式：落到输出目录，文件名不变
-- [ ] 自定义目录模式
-- [ ] 后缀含 `\ / : * ? " < > |` 时被拒绝并给出中文提示
-- [ ] 两个源文件会撞同一输出时提前报错
-- [ ] 「强制重新处理」覆盖已有输出；不勾选时跳过非空输出
+退出码 `0` 表示全部通过。脚本会依次执行：
 
-## 4. 引擎与网络
+1. 检查 SDK 版本；
+2. `dotnet test`（全部单元测试）；
+3. `dotnet build`（WinUI 客户端能否编译）；
+4. 可选：`dotnet publish` 并校验产物。
 
-- [ ] API 提供商：翻译成功
-- [ ] API 提供商：翻译 + 润色成功
-- [ ] 断网时重试 3 次后给出可读错误
-- [ ] 429/5xx 触发重试（可用代理模拟）
-- [ ] Ollama 未安装时给出明确提示
-- [ ] Ollama 已安装时能自动拉起 `ollama serve` 并检查模型
+### 覆盖了哪些验收项
 
-## 5. 并发与取消
+| 原清单项目 | 对应测试 | 说明 |
+| --- | --- | --- |
+| 编码：UTF-8 / BOM / UTF-16 / GBK | `FixtureTests.DecodingMatchesLegacy` | 与 macOS 读同一批 `fixtures/srt` |
+| 解析：多行、畸形块、CRLF | `FixtureTests.BlocksMatchLegacy` | 逐块比对原文与结构 |
+| 组装：译文在上、原文在下 | `FixtureTests.AssembleTranslateMatchesLegacy` | 与 v1 输出逐字一致 |
+| 润色后的组装 | `FixtureTests.AssemblePolishMatchesLegacy` | 含多行条目 |
+| 引号剥离 | `FixtureTests.StripQuotesHandlesBothQuoteStyles` | 中英文引号 |
+| 翻译 → 润色全链路 | `TranslatorTests.TranslateThenPolishMatchesLegacy` | 假模型驱动 |
+| 失败回退原文 | `TranslatorTests.FailureKeepsOriginal` | 单条失败不影响整体 |
+| 批量结果三种格式 | `TranslatorTests.Parses*` | `[n]` / `n.` / 纯行 |
+| 源目录 / 输出目录 / 自定义目录 | `OutputPathsTests` + `JobRunnerTests` | 路径规则与落盘 |
+| 后缀非法字符 | `OutputPathsTests.Rejects*` | 含控制字符 |
+| 同名输出冲突 | `OutputPathsTests.DetectsTwoSourcesCollidingOnOneOutput` | 提前报错 |
+| 跳过已存在 / 强制重跑 | `JobRunnerTests.SkipsExistingOutputWithoutForce` 等 | 两种行为都覆盖 |
+| 200 文件上限 | `JobRunnerTests.RejectsTooManyFiles` | |
+| 取消任务 | `CancellationTests.CancellingMidRunStopsWithoutOutput` | 且不留半截文件 |
+| 429 重试、400 不重试、预算耗尽 | `ChatClientRetryTests` | 假 HTTP 处理器，不联网 |
+| DeepSeek 关闭思考模式 | `ChatClientRetryTests.DisablesThinkingForDeepSeekHost` | |
+| Ollama 请求/响应格式 | `OllamaClientTests` | 原生 `/api/chat`，非流式 |
+| 提供商校验、id 生成 | `ProviderStoreTests` | 含非法 URL、空名称、控制字符 |
+| 密钥不落 JSON | `ProviderStoreTests.SaveKeepsSecretsOutOfJson` | DPAPI 存储 |
+| 旧配置导入 | `ProviderStoreTests.ImportsLegacyEnvFile` | `.env` 与 `providers.json` |
+| 设置取值收敛 | `SettingsStoreTests.SanitizesOutOfRangeValues` | 并发/重试/后缀 |
+| 版本比较 | `UpdateCheckerTests.ComparesVersions` | 语义化版本 |
 
-- [ ] 并发 20 时任务正常完成
-- [ ] 任务进行中取消，能在数秒内停止且不产生半截文件
-- [ ] 200 个文件上限生效
-
-## 6. 提供商与密钥
-
-- [ ] 预设列表完整（9 个）
-- [ ] 新增/编辑/删除提供商
-- [ ] 切换启用项后立即生效
-- [ ] 连通性测试对错误 Key 返回鉴权失败
-- [ ] API Key 存入 **Windows 凭据管理器**，不在明文文件里
-- [ ] 首次启动能从旧 `providers.json` / `.env` 导入并提示删除明文
-
-## 7. 界面
-
-- [ ] 高 DPI（125% / 150%）下不模糊、不错位
-- [ ] 深色模式正常
-- [ ] 拖拽文件/文件夹进窗口可用
-- [ ] 粘贴完整路径后点「添加」可用；不存在的路径有明确提示
-- [ ] 系统文件对话框返回真实路径
-- [ ] 任务列表显示进度、成功/失败计数
-- [ ] 关闭窗口后进程退出（不留后台）
-
-## 8. 更新
-
-- [ ] 「检查更新」能读到 GitHub 最新 release
-- [ ] 已是最新时提示正确
-- [ ] 有新版本时能下载并替换、重启后版本号变化
-- [ ] 更新失败（断网/权限）给出可读错误，不破坏现有安装
-
-## 9. 反馈格式
+### 期望输出
 
 ```text
-项目：4. 引擎与网络
-环境：Windows 11 24H2 / .NET 10.0.x
-现象：……
-日志：%LOCALAPPDATA%\AITrans\logs\app.log 的相关片段
+Passed!  - Failed:     0, Passed:    50+, Skipped:     0, Total:    50+
 ```
+
+数量会随开发增长，关键是 **Failed: 0**。
+
+## 二、人工确认（无法自动化）
+
+这些涉及真实桌面交互或外部服务，需要手动过一遍。
+
+### 启动
+
+- [ ] `windows\dist\app\AITrans.exe`（或 `dotnet run`）能启动并显示主窗口
+- [ ] 首次运行被 SmartScreen 拦截时，「更多信息 → 仍要运行」可放行
+- [ ] 关闭窗口后进程退出
+
+### 界面
+
+- [ ] 拖拽 `.srt` 文件到列表可用
+- [ ] 拖拽文件夹可用（收集其中的 SRT）
+- [ ] 「添加文件」「添加文件夹」打开系统对话框
+- [ ] 粘贴完整路径后回车可添加；错误路径有提示
+- [ ] 高 DPI（125% / 150%）下不模糊、不错位
+- [ ] 深色模式正常
+- [ ] 任务进行中「取消」能及时停止
+
+### 真实服务
+
+- [ ] 用真实 API Key 翻译一个文件，结果正确
+- [ ] 翻译 + 润色正确
+- [ ] 错误 Key 时提示鉴权失败
+- [ ] 已安装 Ollama 时：能自动拉起服务、校验模型并完成翻译
+- [ ] 未安装 Ollama 时：提示清晰
+
+### 系统集成
+
+- [ ] API Key 出现在「凭据管理器」或 `%APPDATA%\AITrans\secrets.dat`（加密），`providers.json` 中无明文
+- [ ] 「检查更新」能读到 GitHub 最新 release
+- [ ] 「打开输出目录」能打开资源管理器
+
+## 三、反馈格式
+
+```text
+步骤：自动化 / 人工
+环境：Windows 11 24H2，.NET 10.0.x
+命令：powershell -ExecutionPolicy Bypass -File windows\scripts\verify.ps1
+现象：……
+完整输出：……
+```
+
+自动化失败时，把脚本输出整段贴回即可定位；人工项失败请附截图或 `%APPDATA%\AITrans\` 下的相关文件。
