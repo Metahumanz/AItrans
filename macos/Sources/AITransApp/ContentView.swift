@@ -43,6 +43,10 @@ struct ContentView: View {
             ProviderSheet()
                 .environmentObject(state)
         }
+        .sheet(item: $state.updateInfo) { info in
+            UpdateSheet(info: info)
+                .environmentObject(state)
+        }
         .alert(
             "提示",
             isPresented: Binding(

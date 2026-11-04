@@ -18,6 +18,8 @@ final class AppState: ObservableObject {
     @Published var activeProviderID: String?
     @Published var updateInfo: UpdateInfo?
     @Published var isCheckingUpdate = false
+    @Published var isDownloadingUpdate = false
+    @Published var downloadedUpdate: URL?
     @Published var isTestingProvider = false
 
     let settingsStore: SettingsStore
@@ -303,6 +305,25 @@ final class AppState: ObservableObject {
                     if info == nil {
                         self.alertMessage = "已是最新版本。"
                     }
+                }
+            } catch {
+                await MainActor.run { self.alertMessage = error.localizedDescription }
+            }
+        }
+    }
+
+    /// 下载新版本并揭示到访达。
+    func downloadUpdate(_ info: UpdateInfo) {
+        guard !isDownloadingUpdate else { return }
+        isDownloadingUpdate = true
+        Task {
+            defer { isDownloadingUpdate = false }
+            do {
+                let url = try await UpdateDownloader.download(info)
+                await MainActor.run {
+                    self.downloadedUpdate = url
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                    self.alertMessage = UpdateDownloader.installHint
                 }
             } catch {
                 await MainActor.run { self.alertMessage = error.localizedDescription }

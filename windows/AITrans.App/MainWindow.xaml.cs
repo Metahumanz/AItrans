@@ -630,13 +630,40 @@ public sealed partial class MainWindow : Window
                 Content = new ScrollViewer
                 {
                     MaxHeight = 320,
-                    Content = new TextBlock { Text = info.Notes, TextWrapping = TextWrapping.Wrap },
+                    Content = new TextBlock
+                    {
+                        Text = string.IsNullOrWhiteSpace(info.Notes) ? "该版本没有填写更新说明。" : info.Notes,
+                        TextWrapping = TextWrapping.Wrap,
+                    },
                 },
-                PrimaryButtonText = "打开下载页",
+                PrimaryButtonText = "下载更新",
+                SecondaryButtonText = "打开下载页",
                 CloseButtonText = "稍后",
                 DefaultButton = ContentDialogButton.Primary,
             };
-            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+
+            var choice = await dialog.ShowAsync();
+            if (choice == ContentDialogResult.Primary)
+            {
+                try
+                {
+                    StatusText.Text = "正在下载更新…";
+                    var path = await UpdateDownloader.DownloadAsync(info);
+                    StatusText.Text = "更新已下载";
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "explorer.exe",
+                        Arguments = $"/select,\"{path}\"",
+                        UseShellExecute = true,
+                    });
+                    await ShowMessageAsync(UpdateDownloader.InstallHint);
+                }
+                catch (Exception error)
+                {
+                    await ShowMessageAsync(error.Message);
+                }
+            }
+            else if (choice == ContentDialogResult.Secondary)
             {
                 await Launcher.LaunchUriAsync(new Uri(info.PageUrl));
             }

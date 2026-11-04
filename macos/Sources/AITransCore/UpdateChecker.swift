@@ -71,3 +71,7 @@ public struct UpdateChecker: Sendable {
         return false
     }
 }
+
+extension UpdateInfo: Identifiable {
+    public var id: String { version }
+}
