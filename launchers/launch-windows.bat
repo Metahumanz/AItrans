@@ -1,7 +1,7 @@
 @echo off
 REM Shared Windows launcher. The per-tool .bat files set AITRANS_MODE and call this file.
 setlocal EnableExtensions
-cd /d "%~dp0"
+cd /d "%~dp0.."
 title AItrans
 chcp 65001 >nul 2>&1
 set "PYTHONIOENCODING=utf-8"

@@ -4,14 +4,16 @@
 
 ```text
 AItrans/
-├─ aitrans.bat / aitrans.command          统一图形界面（推荐，双击启动）
-├─ provider.bat / provider.command        直接打开「提供商」标签页
-├─ trans.bat / trans.command              Ollama 翻译
-├─ transopt.bat / transopt.command        Ollama 翻译 + 润色
-├─ transdeepseek.bat / .command           API 提供商翻译
-├─ transoptdeepseek.bat / .command        API 提供商翻译 + 润色
-├─ launch-windows.bat / launch-windows.py Windows 共用启动逻辑
-├─ launch-mac.sh                          macOS 共用启动逻辑
+├─ aitrans.bat / aitrans.command   统一图形界面（双击启动）
+├─ launchers/                      启动器共用逻辑
+│  ├─ launch-windows.bat / launch-windows.py
+│  └─ launch-mac.sh
+├─ legacy/                         历史版本启动器（命令行）
+│  ├─ provider.bat / provider.command
+│  ├─ trans.bat / trans.command
+│  ├─ transopt.bat / transopt.command
+│  ├─ transdeepseek.bat / transdeepseek.command
+│  └─ transoptdeepseek.bat / transoptdeepseek.command
 ├─ app/                    程序代码
 │  ├─ aitrans_gui.py       图形界面服务（翻译 + 提供商）
 │  ├─ web_base.py          本地 HTTP 服务的公共基类
@@ -41,16 +43,16 @@ AItrans/
 - 可以设置并发数与失败重试次数，API 与 Ollama 分别保存；
 - 设置会自动保存，下次打开恢复上次使用的引擎、模型、语言、输出位置等选项。
 
-| 启动文件（项目根目录） | 功能 |
-| --- | --- |
-| `aitrans.command` / `aitrans.bat` | 统一图形界面（推荐） |
-| `provider.command` / `provider.bat` | 打开统一界面的「提供商」标签页 |
-| `trans.command` / `trans.bat` | 原版：Ollama 本地翻译 |
-| `transopt.command` / `transopt.bat` | 原版：Ollama 本地翻译 + 润色 |
-| `transdeepseek.command` / `transdeepseek.bat` | 原版：使用当前 API 提供商翻译 |
-| `transoptdeepseek.command` / `transoptdeepseek.bat` | 原版：使用当前 API 提供商翻译 + 润色 |
+| 启动文件 | 位置 | 功能 |
+| --- | --- | --- |
+| `aitrans.command` / `aitrans.bat` | 根目录 | 统一图形界面（翻译 + 提供商，推荐） |
+| `provider.command` / `provider.bat` | `legacy/` | 打开统一界面的「提供商」标签页 |
+| `trans.command` / `trans.bat` | `legacy/` | 原版：Ollama 本地翻译 |
+| `transopt.command` / `transopt.bat` | `legacy/` | 原版：Ollama 本地翻译 + 润色 |
+| `transdeepseek.command` / `transdeepseek.bat` | `legacy/` | 原版：使用当前 API 提供商翻译 |
+| `transoptdeepseek.command` / `transoptdeepseek.bat` | `legacy/` | 原版：使用当前 API 提供商翻译 + 润色 |
 
-图形界面是新增入口，原有四个翻译启动器和命令行用法保持不变。首次运行会自动在项目根目录创建 `.venv` 并联网安装依赖，以后复用该环境。
+图形界面是唯一的日常入口，提供商管理已经合并进同一个界面；原来的启动器保留在 `legacy/` 里，命令行用法不变。首次运行会自动在项目根目录创建 `.venv` 并联网安装依赖，以后复用该环境。
 
 ## 图形界面
 
@@ -116,7 +118,7 @@ ollama pull qwen2.5
 
 ## 模型提供商
 
-在统一界面顶部点「提供商」，或双击 `provider.command`（Windows：`provider.bat`）：
+在统一界面顶部点「提供商」即可；旧版的 `legacy/provider.command`（Windows：`legacy/provider.bat`）仍可直达该标签页：
 
 - 从预设添加 DeepSeek、OpenAI、Moonshot、智谱 GLM、阿里云百炼、硅基流动、OpenRouter、Ollama 等（预设只是填写起点，所有字段都可以修改）；
 - 保存任意多个提供商配置，随时切换「当前启用」；
@@ -125,7 +127,7 @@ ollama pull qwen2.5
 
 「提供商」和「翻译」现在在同一个界面里，用顶部的标签页切换；旧书签 `/provider` 会自动跳转到「提供商」标签页。
 
-`transdeepseek.command` 和 `transoptdeepseek.command` 每次启动都会读取 `.env` 中启用的提供商；`trans.command` / `transopt.command` 仍使用 Ollama 原生接口。
+`legacy/transdeepseek.command` 和 `legacy/transoptdeepseek.command` 每次启动都会读取 `.env` 中启用的提供商；`legacy/trans.command` / `legacy/transopt.command` 仍使用 Ollama 原生接口。
 
 也可以手工编辑 `.env`：
 
@@ -141,29 +143,29 @@ AI_MODEL=deepseek-flash
 
 ### DeepSeek
 
-首次运行若没有 Key，会提示输入并保存到 `.env`（输入时不显示字符）。也可以先双击 `provider.command`（Windows：`provider.bat`）配置好再运行。API 调用按账户计费。
+首次运行若没有 Key，会提示输入并保存到 `.env`（输入时不显示字符）。也可以先双击 `aitrans.bat` 在「提供商」标签页配置好再运行。API 调用按账户计费。
 
 ## 原版命令行
 
-原来的四个启动器仍按原方式工作：默认读取项目根目录的 `ori` 文件夹，结果写入 `output`，不会自动保存到源文件目录。适合脚本化或批处理：
+`legacy/` 里的四个启动器仍按原方式工作：默认读取项目根目录的 `ori` 文件夹，结果写入 `output`，不会自动保存到源文件目录。适合脚本化或批处理：
 
 ```sh
-./trans.command --model qwen2.5 --lang zh
-./transopt.command --model qwen2.5 --lang zh --force
-./transdeepseek.command --lang ja
-./transoptdeepseek.command --lang ja --force
+./legacy/trans.command --model qwen2.5 --lang zh
+./legacy/transopt.command --model qwen2.5 --lang zh --force
+./legacy/transdeepseek.command --lang ja
+./legacy/transoptdeepseek.command --lang ja --force
 ```
 
-Windows 上把 `./trans.command` 换成 `trans.bat` 即可，参数完全一致。
+Windows 上把 `./legacy/trans.command` 换成 `legacy\trans.bat` 即可，参数完全一致。
 
 四个翻译脚本新增了通用的输入/输出参数，`aitrans` 图形界面调用的就是这些参数：
 
 ```sh
 # 处理单个文件，结果写到源文件旁边
-./transdeepseek.command --input ~/Movies/a.srt --save-to-source --suffix _zh
+./legacy/transdeepseek.command --input ~/Movies/a.srt --save-to-source --suffix _zh
 
 # 处理整个文件夹，结果写到指定目录
-./transoptdeepseek.command --input ~/Movies/subs --output-dir ~/Movies/out --force
+./legacy/transoptdeepseek.command --input ~/Movies/subs --output-dir ~/Movies/out --force
 ```
 
 常用参数：
@@ -184,20 +186,20 @@ Windows 上把 `./trans.command` 换成 `trans.bat` 即可，参数完全一致�
 
 ```sh
 ./aitrans.command --no-browser
-./provider.command --no-browser
+./legacy/provider.command --no-browser
 ```
 
-Windows 上使用 `aitrans.bat --no-browser` / `provider.bat --no-browser`。
+Windows 上使用 `aitrans.bat --no-browser` / `legacy\provider.bat --no-browser`。
 
 如果复制文件后丢失执行权限，在项目根目录执行：
 
 ```sh
-chmod +x *.command launch-mac.sh
+chmod +x aitrans.command legacy/*.command launchers/launch-mac.sh
 ```
 
 ## Windows
 
-双击根目录对应的 `.bat` 即可，功能与 macOS 的 `.command` 一一对应（见顶部表格）。
+双击根目录的 `aitrans.bat` 即可；`legacy/` 里的旧启动器功能与 macOS 的 `.command` 一一对应（见顶部表格）。
 
 首次运行会自动：
 
@@ -210,10 +212,10 @@ chmod +x *.command launch-mac.sh
 
 ```bat
 aitrans.bat
-provider.bat
-trans.bat --model qwen2.5 --lang zh
-transoptdeepseek.bat --lang ja --force
-transdeepseek.bat --input "D:\Movies\a.srt" --save-to-source --suffix _zh
+legacy\provider.bat
+legacy\trans.bat --model qwen2.5 --lang zh
+legacy\transoptdeepseek.bat --lang ja --force
+legacy\transdeepseek.bat --input "D:\Movies\a.srt" --save-to-source --suffix _zh
 ```
 
 说明：
@@ -233,6 +235,6 @@ transdeepseek.bat --input "D:\Movies\a.srt" --save-to-source --suffix _zh
 或使用启动器：
 
 ```bat
-launch-windows.py --mode aitrans
+launchers\launch-windows.py --mode aitrans
 ```
 

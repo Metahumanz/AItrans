@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Windows 启动器（对应 macOS 的 launch-mac.sh）。
 
-双击任意 `.bat` 启动器后，由本脚本完成准备工作：
+双击 `aitrans.bat`（或 legacy/ 中的旧启动器）后，由本脚本完成准备工作：
 
 1. 创建或复用项目内的 `.venv`（macOS 复制过来的旧环境会自动重建）；
 2. 按需安装 `tqdm`、`ollama` 依赖；
@@ -26,7 +26,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 HERE = Path(__file__).resolve().parent
-ROOT = HERE
+ROOT = HERE.parent
 APP_DIR = ROOT / "app"
 VENV_DIR = ROOT / ".venv"
 VENV_PYTHON = VENV_DIR / "Scripts" / "python.exe"
@@ -344,7 +344,7 @@ def main(argv=None):
     mode = known.mode.strip()
     spec = MODES.get(mode)
     if spec is None:
-        print("错误：未知的启动模式。请通过文件夹中的 .bat 启动器运行。")
+        print("错误：未知的启动模式。请通过 aitrans.bat 启动。")
         return 2
 
     os.chdir(ROOT)

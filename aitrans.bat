@@ -1,5 +1,5 @@
 @echo off
 setlocal
 set "AITRANS_MODE=aitrans"
-call "%~dp0launch-windows.bat" %*
+call "%~dp0launchers\launch-windows.bat" %*
 exit /b %ERRORLEVEL%

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Shared launcher for the macOS Finder entry points (Bash 3.2 compatible).
 set -e
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:/Applications/Ollama.app/Contents/Resources"
 export PYTHONPATH="$PWD/app${PYTHONPATH:+:$PYTHONPATH}"
 export PYTHONDONTWRITEBYTECODE=1
@@ -106,7 +106,7 @@ try:
     get_api_key()
 except RuntimeError:
     if not sys.stdin.isatty() and not sys.stderr.isatty():
-        raise SystemExit("未配置 API Key。请双击 provider.command 配置，或设置 AI_API_KEY。")
+        raise SystemExit("未配置 API Key。请双击 aitrans.command 配置，或设置 AI_API_KEY。")
     config = resolve_runtime_config()
     print(f"首次运行：请输入「{config['provider_name']}」的 API Key，将保存到本目录的 .env。")
     key = getpass.getpass("API Key（输入不显示）: ").strip()
