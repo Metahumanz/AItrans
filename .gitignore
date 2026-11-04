@@ -58,3 +58,17 @@ venv.bak/
 *.swp
 *.swo
 *~
+
+# 仅本地保留的设计文档
+/docs/local/
+
+# Swift / macOS
+macos/.build/
+macos/.swiftpm/
+macos/dist/
+*.xcuserstate
+
+# .NET / Windows
+windows/**/bin/
+windows/**/obj/
+windows/dist/

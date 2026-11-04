@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Metahumanz/AItrans/spec/settings.schema.json",
+  "title": "AItrans settings",
+  "type": "object",
+  "required": ["version", "backend", "lang", "translate", "polish", "output_mode", "suffix"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "backend": { "enum": ["api", "ollama"] },
+    "api_model": { "type": "string", "maxLength": 200 },
+    "ollama_model": { "type": "string", "maxLength": 200 },
+    "lang": { "enum": ["zh", "en", "ja", "ko"] },
+    "translate": { "type": "boolean" },
+    "polish": { "type": "boolean" },
+    "output_mode": { "enum": ["source", "output", "custom"] },
+    "suffix": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "custom_dir": { "type": "string" },
+    "force": { "type": "boolean" },
+    "api_workers": { "type": "integer", "minimum": 1, "maximum": 64 },
+    "api_retries": { "type": "integer", "minimum": 0, "maximum": 5 },
+    "ollama_workers": { "type": "integer", "minimum": 1, "maximum": 64 },
+    "ollama_retries": { "type": "integer", "minimum": 0, "maximum": 5 }
+  }
+}

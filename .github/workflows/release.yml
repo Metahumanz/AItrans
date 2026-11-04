@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    name: macOS 产物
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 版本号
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: 测试
+        working-directory: macos
+        run: swift test --disable-sandbox
+
+      - name: 打包
+        run: ./macos/Scripts/package-app.sh "${{ steps.version.outputs.value }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-dist
+          path: macos/dist/*.zip
+          if-no-files-found: error
+
+  windows:
+    name: Windows 产物
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 检测 Windows 工程
+        id: detect
+        shell: bash
+        run: |
+          if [ -f windows/AITrans.sln ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-dotnet@v4
+        if: steps.detect.outputs.found == 'true'
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: 测试
+        if: steps.detect.outputs.found == 'true'
+        working-directory: windows
+        run: dotnet test -c Release
+
+      - name: 发布
+        if: steps.detect.outputs.found == 'true'
+        shell: bash
+        working-directory: windows
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          dotnet publish AITrans.App/AITrans.App.csproj \
+            -c Release -r win-x64 --self-contained true \
+            -p:Version="$VERSION" \
+            -o dist/app
+          cd dist/app && 7z a -tzip "../AITrans-${VERSION}-win-x64.zip" . > /dev/null
+          ls -l ../*.zip
+
+      - uses: actions/upload-artifact@v4
+        if: steps.detect.outputs.found == 'true'
+        with:
+          name: windows-dist
+          path: windows/dist/*.zip
+          if-no-files-found: error
+
+  publish:
+    name: 创建 Release
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 汇总产物
+        run: |
+          mkdir -p dist
+          find artifacts -name '*.zip' -exec cp {} dist/ \;
+          ls -l dist
+
+      - name: 创建 GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.zip \
+            --title "AItrans $GITHUB_REF_NAME" \
+            --generate-notes \
+            --notes "未签名版本。首次打开需要手动放行：macOS 右键打开或到「隐私与安全性」允许；Windows 在 SmartScreen 里点「更多信息 → 仍要运行」。"

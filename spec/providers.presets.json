@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "base_url": "https://api.deepseek.com",
+      "model": "deepseek-flash",
+      "requires_key": true
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "base_url": "https://api.openai.com/v1",
+      "model": "gpt-4o-mini",
+      "requires_key": true
+    },
+    {
+      "id": "moonshot",
+      "name": "Moonshot 月之暗面",
+      "base_url": "https://api.moonshot.cn/v1",
+      "model": "moonshot-v1-8k",
+      "requires_key": true
+    },
+    {
+      "id": "zhipu",
+      "name": "智谱 GLM",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "model": "glm-4-flash",
+      "requires_key": true
+    },
+    {
+      "id": "dashscope",
+      "name": "阿里云百炼（通义千问）",
+      "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "model": "qwen-plus",
+      "requires_key": true
+    },
+    {
+      "id": "siliconflow",
+      "name": "硅基流动 SiliconFlow",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "model": "deepseek-ai/DeepSeek-V3",
+      "requires_key": true
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "base_url": "https://openrouter.ai/api/v1",
+      "model": "openai/gpt-4o-mini",
+      "requires_key": true
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama（本地 OpenAI 兼容）",
+      "base_url": "http://localhost:11434/v1",
+      "model": "qwen2.5",
+      "requires_key": false
+    },
+    {
+      "id": "custom",
+      "name": "自定义 OpenAI 兼容服务",
+      "base_url": "",
+      "model": "",
+      "requires_key": true
+    }
+  ]
+}

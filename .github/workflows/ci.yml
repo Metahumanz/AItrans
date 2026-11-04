@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  spec:
+    name: 契约与黄金样本
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装 legacy 依赖
+        run: python3 -m pip install --quiet tqdm
+
+      - name: spec 生成物是否最新
+        run: python3 tools/gen_spec.py --check
+
+      - name: 黄金样本是否可重现
+        run: |
+          TQDM_DISABLE=1 python3 tools/gen_fixtures.py
+          git diff --exit-code -- fixtures/
+
+  macos:
+    name: macOS 构建与测试
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Swift 版本
+        run: swift --version
+
+      - name: 测试
+        working-directory: macos
+        run: swift test --disable-sandbox
+
+      - name: 打包
+        run: ./macos/Scripts/package-app.sh 0.0.0-ci
+
+  windows:
+    name: Windows 构建与测试
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 检测 Windows 工程
+        id: detect
+        shell: bash
+        run: |
+          if [ -f windows/AITrans.sln ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "windows/ 尚未落地，跳过。"
+          fi
+
+      - uses: actions/setup-dotnet@v4
+        if: steps.detect.outputs.found == 'true'
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: 测试
+        if: steps.detect.outputs.found == 'true'
+        working-directory: windows
+        run: dotnet test -c Release

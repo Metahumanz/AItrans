@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "blockSplitRegex": "\\r?\\n\\r?\\n",
+  "minLinesForValidBlock": 3,
+  "quoteStripRegex": "^[\"“]|[\"”]$",
+  "timecodeLineIndex": 1,
+  "textStartsAtLine": 2,
+  "assembleTemplate": "{{index}}\n{{timeline}}\n{{translated}}\n{{original}}",
+  "blockSeparator": "\n\n",
+  "batchResultPatterns": [
+    "\\[(\\d+)\\]\\s*(.+?)(?=\\n\\[|\\Z)",
+    "(?:^|\\n)(\\d+)[.:：．]\\s*(.+?)(?=\\n\\d+[.:：．]|\\Z)",
+    "__linewise__"
+  ],
+  "polish": {
+    "defaultBatchSize": 8,
+    "defaultWorkers": 5,
+    "contextBatches": 2,
+    "fallbackWhenParsedLessThanHalf": true
+  },
+  "translate": {
+    "defaultWorkers": 50,
+    "defaultTimeoutSeconds": 120,
+    "defaultRetries": 2
+  },
+  "retry": {
+    "delayBaseSeconds": 2,
+    "delayFormula": "pow(delayBaseSeconds, attempt)",
+    "retryableHttpStatuses": [429],
+    "retryableHttpStatusAtLeast": 500,
+    "retryableTransportErrors": true
+  },
+  "thinking": {
+    "defaultWhenHostContains": "deepseek",
+    "overrideEnvVar": "AI_THINKING",
+    "disabledPayload": { "type": "disabled" }
+  }
+}
