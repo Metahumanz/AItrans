@@ -1,0 +1,7 @@
+# Shell entry points must keep LF so macOS and Linux can run them.
+*.command text eol=lf
+*.sh      text eol=lf
+*.py      text eol=lf
+
+# Windows batch files are read by cmd.exe, which expects CRLF.
+*.bat     text eol=crlf
