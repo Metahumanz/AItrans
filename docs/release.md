@@ -4,18 +4,23 @@
 
 ## 1. 发布方式
 
-推一个 `v*` 标签即可触发 `.github/workflows/release.yml`：
+推一个 `v*` 标签即可同时触发两个独立工作流：
 
 ```sh
 git tag v2.0.0
 git push origin v2.0.0
 ```
 
-工作流会：
+| 工作流 | 平台 | 内容 |
+| --- | --- | --- |
+| `release-macos.yml` | macOS | 跑测试 → 打包 `.app` → 上传 zip |
+| `release-windows.yml` | Windows | 跑测试 → `dotnet publish` → 上传 zip |
 
-1. 校验 `spec/` 与生成代码一致（`tools/gen_spec.py --check`）；
-2. 跑两端单元测试；
-3. 构建产物并附加到该标签对应的 GitHub Release。
+两者**互不依赖**：任一平台排队或失败，都不会阻塞另一平台发布。都支持 `workflow_dispatch`
+（传入 tag），可以只重跑单个平台。
+
+发布步骤是幂等的：Release 已存在就补传（`--clobber`），不存在才创建；两个平台同时创建时，
+后到的一方会退回补传。
 
 ## 2. 产物
 
