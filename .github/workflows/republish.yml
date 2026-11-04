@@ -1,0 +1,46 @@
+name: Republish assets
+
+# 从某次运行里把已构建的产物补传到已有的 Release。
+# 用途：当某个平台的 runner 长时间无容量、但另一平台产物已就绪时，
+# 不必重跑整条发布流水线。
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "目标 Release 的 tag（例如 v0.1.1）"
+        required: true
+      run_id:
+        description: "产物所在的 workflow run id"
+        required: true
+      artifact:
+        description: "产物名称（例如 windows-dist / macos-dist）"
+        required: true
+        default: windows-dist
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  attach:
+    name: 补传产物
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 下载产物
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          run-id: ${{ inputs.run_id }}
+          path: dist
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上传到 Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -lh dist
+          gh release upload "${{ inputs.tag }}" dist/*.zip --clobber
+          gh release view "${{ inputs.tag }}" --json assets --jq '.assets[] | "\(.name) \(.size)"'
