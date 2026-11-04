@@ -115,13 +115,18 @@ final class AppState: ObservableObject {
             alertMessage = "请先添加字幕文件。"
             return
         }
-        guard let provider = activeProvider else {
+        let usesOllama = settings.backend == .ollama
+        let provider = activeProvider
+        if !usesOllama, provider == nil {
             alertMessage = "请先在「提供商」里添加并启用一个提供商。"
             return
         }
-        let model = effectiveModel
+
+        let model = usesOllama
+            ? settings.ollamaModel.trimmingCharacters(in: .whitespaces)
+            : effectiveModel
         guard !model.isEmpty else {
-            alertMessage = "请填写模型名称。"
+            alertMessage = usesOllama ? "请填写 Ollama 模型名称。" : "请填写模型名称。"
             return
         }
 
@@ -132,12 +137,20 @@ final class AppState: ObservableObject {
             return
         }
 
-        let client = ChatClient(
-            baseURL: provider.baseURL,
-            apiKey: provider.apiKey,
-            model: model,
-            policy: RetryPolicy(retries: settings.apiRetries)
-        )
+        let client: any ChatCompleting
+        if usesOllama {
+            client = OllamaClient(
+                model: model,
+                policy: RetryPolicy(retries: settings.ollamaRetries)
+            )
+        } else {
+            client = ChatClient(
+                baseURL: provider?.baseURL ?? "",
+                apiKey: provider?.apiKey ?? "",
+                model: model,
+                policy: RetryPolicy(retries: settings.apiRetries)
+            )
+        }
         let runner = JobRunner(translator: Translator(client: client))
         let currentSettings = settings
         let pending = files
@@ -151,6 +164,11 @@ final class AppState: ObservableObject {
         task = Task { [weak self] in
             guard let self else { return }
             do {
+                if currentSettings.backend == .ollama {
+                    self.statusText = "正在检查本地 Ollama…"
+                    try await OllamaService.ensureRunning()
+                    try await OllamaService.ensureModel(currentSettings.ollamaModel)
+                }
                 let output = try await runner.run(
                     files: pending,
                     settings: currentSettings,

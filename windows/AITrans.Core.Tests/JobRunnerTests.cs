@@ -111,13 +111,20 @@ public sealed class JobRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task RejectsOllamaBackendForNow()
+    public async Task OllamaBackendRunsWithSamePipeline()
     {
         var file = CopyFixture("basic-utf8.srt");
-        var settings = new AppSettings { Backend = Engine.ollama };
+        var settings = new AppSettings
+        {
+            Backend = Engine.ollama,
+            OutputMode = OutputMode.source,
+            Polish = false,
+        };
 
-        var error = await Assert.ThrowsAsync<AITransException>(
-            () => Runner().RunAsync([file], settings, _workDir, null));
-        Assert.Contains("Ollama", error.Message);
+        var results = await Runner().RunAsync([file], settings, _workDir, null);
+
+        Assert.Equal(FileResult.StatusKind.success, results[0].Status);
+        var output = Path.Combine(_workDir, "basic-utf8_translated.srt");
+        Assert.Contains("〔译〕", File.ReadAllText(output));
     }
 }

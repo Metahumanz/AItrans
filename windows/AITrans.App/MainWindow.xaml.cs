@@ -77,7 +77,7 @@ public sealed partial class MainWindow : Window
     private void BuildCombos()
     {
         EngineCombo.Items.Add("API 提供商");
-        EngineCombo.Items.Add("本地 Ollama（未接入）");
+        EngineCombo.Items.Add("本地 Ollama");
         LanguageCombo.Items.Add("中文");
         LanguageCombo.Items.Add("英文");
         LanguageCombo.Items.Add("日文");
@@ -340,31 +340,36 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        SaveSettings();
+        var settings = _settingsStore.Settings;
+        var usesOllama = settings.Backend == Engine.ollama;
+
         var provider = _providerStore.ActiveProvider;
-        if (provider is null)
+        if (!usesOllama && provider is null)
         {
             await ShowMessageAsync("请先在「管理提供商」里添加并启用一个提供商。");
             return;
         }
 
-        var model = string.IsNullOrWhiteSpace(ModelBox.Text) ? provider.Model : ModelBox.Text.Trim();
+        var model = usesOllama
+            ? settings.OllamaModel.Trim()
+            : (string.IsNullOrWhiteSpace(ModelBox.Text) ? provider!.Model : ModelBox.Text.Trim());
         if (string.IsNullOrWhiteSpace(model))
         {
-            await ShowMessageAsync("请填写模型名称。");
+            await ShowMessageAsync(usesOllama ? "请填写 Ollama 模型名称。" : "请填写模型名称。");
             return;
         }
-
-        SaveSettings();
-        var settings = _settingsStore.Settings;
         var customDirectory = settings.OutputMode == OutputMode.custom && !string.IsNullOrWhiteSpace(settings.CustomDir)
             ? settings.CustomDir
             : null;
 
-        var client = new ChatClient(
-            provider.BaseUrl,
-            provider.ApiKey,
-            model,
-            policy: new RetryPolicy(settings.ApiRetries));
+        IChatCompleter client = usesOllama
+            ? new OllamaClient(model, policy: new RetryPolicy(settings.OllamaRetries))
+            : new ChatClient(
+                provider!.BaseUrl,
+                provider!.ApiKey,
+                model,
+                policy: new RetryPolicy(settings.ApiRetries));
         var runner = new JobRunner(new Translator(client));
 
         _cts = new CancellationTokenSource();
@@ -386,6 +391,13 @@ public sealed partial class MainWindow : Window
 
         try
         {
+            if (usesOllama)
+            {
+                StatusText.Text = "正在检查本地 Ollama…";
+                await OllamaService.EnsureRunningAsync();
+                await OllamaService.EnsureModelAsync(settings.OllamaModel);
+            }
+
             var results = await runner.RunAsync(
                 _files,
                 settings,

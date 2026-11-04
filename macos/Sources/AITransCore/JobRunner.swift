@@ -32,10 +32,6 @@ public struct JobRunner: Sendable {
         guard files.count <= Self.maxFiles else {
             throw AITransError("一次最多处理 \(Self.maxFiles) 个文件。")
         }
-        // Ollama 引擎在 v2 尚未接入，先明确报错而不是悄悄走 API。
-        guard settings.backend == .api else {
-            throw AITransError("本地 Ollama 引擎尚未接入 v2 客户端。")
-        }
 
         let pairs = try OutputPaths.prepareOutputs(
             sources: files,
@@ -73,20 +69,24 @@ public struct JobRunner: Sendable {
                     continue
                 }
 
+                // 本地 Ollama 默认并发更低，避免显存吃紧。
+                let workers = settings.backend == .api ? settings.apiWorkers : settings.ollamaWorkers
                 let translated = try await translator.translate(
                     blocks: blocks,
                     language: settings.lang,
-                    workers: settings.apiWorkers,
+                    workers: workers,
                     onProgress: onCueProgress
                 )
 
                 var translations = translated.translations
                 if settings.polish {
+                    // v1 的 Ollama 润色按批次串行。
+                    let polishWorkers = settings.backend == .api ? Spec.defaultPolishWorkers : 1
                     let polished = try await translator.polish(
                         blocks: blocks,
                         translations: translations,
                         batchSize: Spec.defaultPolishBatchSize,
-                        workers: Spec.defaultPolishWorkers
+                        workers: polishWorkers
                     )
                     translations = polished.translations
                 }

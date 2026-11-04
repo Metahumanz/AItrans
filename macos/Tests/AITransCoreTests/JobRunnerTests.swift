@@ -132,21 +132,22 @@ final class JobRunnerTests: XCTestCase {
         }
     }
 
-    func testOllamaBackendIsRejectedForNow() async throws {
+    func testOllamaBackendRunsWithSamePipeline() async throws {
         let file = try copyFixture("basic-utf8.srt", to: workDir)
         var settings = AppSettings()
         settings.backend = .ollama
+        settings.outputMode = .source
+        settings.polish = false
 
-        do {
-            _ = try await makeRunner().run(
-                files: [file],
-                settings: settings,
-                outputDirectory: workDir,
-                customDirectory: nil
-            )
-            XCTFail("Ollama 尚未接入，应报错")
-        } catch let error as AITransError {
-            XCTAssertTrue(error.message.contains("Ollama"))
-        }
+        let results = try await makeRunner().run(
+            files: [file],
+            settings: settings,
+            outputDirectory: workDir,
+            customDirectory: nil
+        )
+
+        XCTAssertEqual(results[0].status, .success)
+        let output = workDir.appending(path: "basic-utf8_translated.srt")
+        XCTAssertTrue(try String(contentsOf: output, encoding: .utf8).contains("〔译〕"))
     }
 }

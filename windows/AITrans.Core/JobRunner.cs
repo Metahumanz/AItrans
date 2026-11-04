@@ -30,11 +30,6 @@ public sealed class JobRunner
         {
             throw new AITransException($"一次最多处理 {MaxFiles} 个文件。");
         }
-        if (settings.Backend != Engine.api)
-        {
-            throw new AITransException("本地 Ollama 引擎尚未接入 v2 客户端。");
-        }
-
         var pairs = OutputPaths.PrepareOutputs(
             files, settings.OutputMode, settings.Suffix, outputDirectory, customDirectory);
 
@@ -73,15 +68,19 @@ public sealed class JobRunner
                     continue;
                 }
 
+                // 本地 Ollama 默认并发更低，避免显存吃紧。
+                var workers = settings.Backend == Engine.api ? settings.ApiWorkers : settings.OllamaWorkers;
                 var translated = await _translator.TranslateAsync(
-                    blocks, settings.Lang, settings.ApiWorkers, cueProgress, cancellationToken)
+                    blocks, settings.Lang, workers, cueProgress, cancellationToken)
                     .ConfigureAwait(false);
 
                 var translations = translated.Translations;
                 if (settings.Polish)
                 {
+                    // v1 的 Ollama 润色按批次串行。
+                    var polishWorkers = settings.Backend == Engine.api ? Spec.DefaultPolishWorkers : 1;
                     var polished = await _translator.PolishAsync(
-                        blocks, translations, Spec.DefaultPolishBatchSize, Spec.DefaultPolishWorkers,
+                        blocks, translations, Spec.DefaultPolishBatchSize, polishWorkers,
                         progress: null, cancellationToken: cancellationToken).ConfigureAwait(false);
                     translations = polished.Translations;
                 }

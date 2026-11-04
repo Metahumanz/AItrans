@@ -196,11 +196,17 @@ struct ContentView: View {
             Section("翻译") {
                 Picker("引擎", selection: $state.settings.backend) {
                     Text("API 提供商").tag(Engine.api)
-                    Text("本地 Ollama（未接入）").tag(Engine.ollama)
+                    Text("本地 Ollama").tag(Engine.ollama)
                 }
                 .pickerStyle(.menu)
 
-                TextField("模型", text: $state.settings.apiModel, prompt: Text(state.activeProvider?.model ?? "deepseek-flash"))
+                TextField("模型", text: modelBinding, prompt: Text(modelPrompt))
+
+                if state.settings.backend == .ollama {
+                    Text("需要先安装 Ollama 并准备好模型，例如 qwen2.5。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 Picker("目标语言", selection: $state.settings.lang) {
                     ForEach(Language.allCases, id: \.self) { language in
@@ -251,6 +257,18 @@ struct ContentView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var modelBinding: Binding<String> {
+        state.settings.backend == .api
+            ? $state.settings.apiModel
+            : $state.settings.ollamaModel
+    }
+
+    private var modelPrompt: String {
+        state.settings.backend == .api
+            ? (state.activeProvider?.model ?? "deepseek-flash")
+            : "qwen2.5"
     }
 
     private func chooseCustomDirectory() {
