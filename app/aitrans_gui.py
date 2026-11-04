@@ -640,13 +640,13 @@ class App:
         if importlib.util.find_spec("tqdm") is None:
             raise GuiError(
                 localize_launcher_text(
-                    "缺少 tqdm 依赖，请通过 launchers/aitrans.command 启动以自动安装依赖。"
+                    "缺少 tqdm 依赖，请通过 aitrans.command 启动以自动安装依赖。"
                 )
             )
         if settings["backend"] == "ollama" and importlib.util.find_spec("ollama") is None:
             raise GuiError(
                 localize_launcher_text(
-                    "缺少 ollama 依赖，请通过 launchers/aitrans.command 启动以自动安装依赖。"
+                    "缺少 ollama 依赖，请通过 aitrans.command 启动以自动安装依赖。"
                 )
             )
 
@@ -1124,7 +1124,7 @@ class Handler(BaseHandler):
             if not self._token_ok():
                 self._send_text(
                     403,
-                    "链接无效或已过期。请重新双击 launchers/aitrans.command 启动。",
+                    "链接无效或已过期。请重新双击 aitrans.command 启动。",
                 )
                 return
             self._send_html_file(HTML_PATH)
@@ -1135,7 +1135,7 @@ class Handler(BaseHandler):
             if not self._token_ok():
                 self._send_text(
                     403,
-                    "链接无效或已过期。请重新双击 launchers/aitrans.command 启动。",
+                    "链接无效或已过期。请重新双击 aitrans.command 启动。",
                 )
                 return
             token = (parse_qs(parsed.query).get("token") or [""])[0]

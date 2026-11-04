@@ -4,15 +4,14 @@
 
 ```text
 AItrans/
-├─ launchers/              启动器（双击这里面的文件）
-│  ├─ aitrans.bat / aitrans.command          统一图形界面（推荐）
-│  ├─ provider.bat / provider.command        直接打开「提供商」标签页
-│  ├─ trans.bat / trans.command              Ollama 翻译
-│  ├─ transopt.bat / transopt.command        Ollama 翻译 + 润色
-│  ├─ transdeepseek.bat / .command           API 提供商翻译
-│  ├─ transoptdeepseek.bat / .command        API 提供商翻译 + 润色
-│  ├─ launch-windows.bat / launch-windows.py Windows 共用启动逻辑
-│  └─ launch-mac.sh                          macOS 共用启动逻辑
+├─ aitrans.bat / aitrans.command          统一图形界面（推荐，双击启动）
+├─ provider.bat / provider.command        直接打开「提供商」标签页
+├─ trans.bat / trans.command              Ollama 翻译
+├─ transopt.bat / transopt.command        Ollama 翻译 + 润色
+├─ transdeepseek.bat / .command           API 提供商翻译
+├─ transoptdeepseek.bat / .command        API 提供商翻译 + 润色
+├─ launch-windows.bat / launch-windows.py Windows 共用启动逻辑
+├─ launch-mac.sh                          macOS 共用启动逻辑
 ├─ app/                    程序代码
 │  ├─ aitrans_gui.py       图形界面服务（翻译 + 提供商）
 │  ├─ web_base.py          本地 HTTP 服务的公共基类
@@ -33,7 +32,7 @@ AItrans/
 
 ## 快速开始（图形界面）
 
-双击 `launchers/aitrans.bat`（Windows）或 `launchers/aitrans.command`（macOS），会在浏览器中打开本地图形界面（只监听 `127.0.0.1`，不会把文件上传到第三方；翻译仍按所选引擎访问 API 或本地 Ollama）：
+双击根目录的 `aitrans.bat`（Windows）或 `aitrans.command`（macOS），会在浏览器中打开本地图形界面（只监听 `127.0.0.1`，不会把文件上传到第三方；翻译仍按所选引擎访问 API 或本地 Ollama）：
 
 - 拖入 `.srt` 文件或文件夹，也可以使用系统原生文件选择器；
 - 默认勾选「翻译 + 润色」，可以只翻译或增加润色；
@@ -42,7 +41,7 @@ AItrans/
 - 可以设置并发数与失败重试次数，API 与 Ollama 分别保存；
 - 设置会自动保存，下次打开恢复上次使用的引擎、模型、语言、输出位置等选项。
 
-| 启动文件（`launchers/` 目录） | 功能 |
+| 启动文件（项目根目录） | 功能 |
 | --- | --- |
 | `aitrans.command` / `aitrans.bat` | 统一图形界面（推荐） |
 | `provider.command` / `provider.bat` | 打开统一界面的「提供商」标签页 |
@@ -117,7 +116,7 @@ ollama pull qwen2.5
 
 ## 模型提供商
 
-在统一界面顶部点「提供商」，或双击 `launchers/provider.command`（Windows：`launchers/provider.bat`）：
+在统一界面顶部点「提供商」，或双击 `provider.command`（Windows：`provider.bat`）：
 
 - 从预设添加 DeepSeek、OpenAI、Moonshot、智谱 GLM、阿里云百炼、硅基流动、OpenRouter、Ollama 等（预设只是填写起点，所有字段都可以修改）；
 - 保存任意多个提供商配置，随时切换「当前启用」；
@@ -142,29 +141,29 @@ AI_MODEL=deepseek-flash
 
 ### DeepSeek
 
-首次运行若没有 Key，会提示输入并保存到 `.env`（输入时不显示字符）。也可以先双击 `launchers/provider.command`（Windows：`launchers/provider.bat`）配置好再运行。API 调用按账户计费。
+首次运行若没有 Key，会提示输入并保存到 `.env`（输入时不显示字符）。也可以先双击 `provider.command`（Windows：`provider.bat`）配置好再运行。API 调用按账户计费。
 
 ## 原版命令行
 
 原来的四个启动器仍按原方式工作：默认读取项目根目录的 `ori` 文件夹，结果写入 `output`，不会自动保存到源文件目录。适合脚本化或批处理：
 
 ```sh
-./launchers/trans.command --model qwen2.5 --lang zh
-./launchers/transopt.command --model qwen2.5 --lang zh --force
-./launchers/transdeepseek.command --lang ja
-./launchers/transoptdeepseek.command --lang ja --force
+./trans.command --model qwen2.5 --lang zh
+./transopt.command --model qwen2.5 --lang zh --force
+./transdeepseek.command --lang ja
+./transoptdeepseek.command --lang ja --force
 ```
 
-Windows 上把 `./launchers/trans.command` 换成 `launchers\trans.bat` 即可，参数完全一致。
+Windows 上把 `./trans.command` 换成 `trans.bat` 即可，参数完全一致。
 
 四个翻译脚本新增了通用的输入/输出参数，`aitrans` 图形界面调用的就是这些参数：
 
 ```sh
 # 处理单个文件，结果写到源文件旁边
-./launchers/transdeepseek.command --input ~/Movies/a.srt --save-to-source --suffix _zh
+./transdeepseek.command --input ~/Movies/a.srt --save-to-source --suffix _zh
 
 # 处理整个文件夹，结果写到指定目录
-./launchers/transoptdeepseek.command --input ~/Movies/subs --output-dir ~/Movies/out --force
+./transoptdeepseek.command --input ~/Movies/subs --output-dir ~/Movies/out --force
 ```
 
 常用参数：
@@ -184,21 +183,21 @@ Windows 上把 `./launchers/trans.command` 换成 `launchers\trans.bat` 即可�
 只启动服务、不自动打开浏览器：
 
 ```sh
-./launchers/aitrans.command --no-browser
-./launchers/provider.command --no-browser
+./aitrans.command --no-browser
+./provider.command --no-browser
 ```
 
-Windows 上使用 `launchers\aitrans.bat --no-browser` / `launchers\provider.bat --no-browser`。
+Windows 上使用 `aitrans.bat --no-browser` / `provider.bat --no-browser`。
 
 如果复制文件后丢失执行权限，在项目根目录执行：
 
 ```sh
-chmod +x launchers/*.command launchers/launch-mac.sh
+chmod +x *.command launch-mac.sh
 ```
 
 ## Windows
 
-双击 `launchers` 文件夹里对应的 `.bat` 即可，功能与 macOS 的 `.command` 一一对应（见顶部表格）。
+双击根目录对应的 `.bat` 即可，功能与 macOS 的 `.command` 一一对应（见顶部表格）。
 
 首次运行会自动：
 
@@ -210,11 +209,11 @@ chmod +x launchers/*.command launchers/launch-mac.sh
 也可以在命令行中直接调用，参数和 macOS 完全一致：
 
 ```bat
-launchers\aitrans.bat
-launchers\provider.bat
-launchers\trans.bat --model qwen2.5 --lang zh
-launchers\transoptdeepseek.bat --lang ja --force
-launchers\transdeepseek.bat --input "D:\Movies\a.srt" --save-to-source --suffix _zh
+aitrans.bat
+provider.bat
+trans.bat --model qwen2.5 --lang zh
+transoptdeepseek.bat --lang ja --force
+transdeepseek.bat --input "D:\Movies\a.srt" --save-to-source --suffix _zh
 ```
 
 说明：
@@ -234,5 +233,6 @@ launchers\transdeepseek.bat --input "D:\Movies\a.srt" --save-to-source --suffix 
 或使用启动器：
 
 ```bat
-launchers\launch-windows.py --mode aitrans
+launch-windows.py --mode aitrans
 ```
+

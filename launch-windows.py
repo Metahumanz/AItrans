@@ -26,7 +26,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 HERE = Path(__file__).resolve().parent
-ROOT = HERE.parent
+ROOT = HERE
 APP_DIR = ROOT / "app"
 VENV_DIR = ROOT / ".venv"
 VENV_PYTHON = VENV_DIR / "Scripts" / "python.exe"
