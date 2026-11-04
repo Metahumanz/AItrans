@@ -9,6 +9,7 @@ v2 是双原生客户端：macOS 用 SwiftUI，Windows 用 C# + .NET + WinUI 3�
 | [architecture.md](architecture.md) | 分层、模块边界、契约与生成物、为什么两端各写一份逻辑 |
 | [release.md](release.md) | GitHub Actions 构建与发布、无签名分发、用户如何放行 |
 | [verification-windows.md](verification-windows.md) | Windows 端需要人工验证的清单 |
+| [legacy-cli.md](legacy-cli.md) | v1 命令行与旧图形界面的完整用法 |
 | [../spec/README.md](../spec/README.md) | 契约文件说明与修改流程 |
 
 ## 只留本地
