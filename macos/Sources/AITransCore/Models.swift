@@ -76,7 +76,7 @@ public enum OutputMode: String, Codable, Sendable, CaseIterable {
 }
 
 /// 界面设置，持久化到 `settings.json`。
-public struct Settings: Sendable, Equatable, Codable {
+public struct AppSettings: Sendable, Equatable, Codable {
     public var version: Int = 1
     public var backend: Engine = .api
     public var apiModel: String = ""
