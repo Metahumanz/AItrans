@@ -87,6 +87,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/download-artifact@v4
         with:
@@ -98,11 +100,24 @@ jobs:
           find artifacts -name '*.zip' -exec cp {} dist/ \;
           ls -l dist
 
+      - name: 生成更新说明
+        run: |
+          {
+            echo "未签名版本，首次打开需要手动放行："
+            echo
+            echo "- macOS：右键点 App →「打开」，或到「系统设置 → 隐私与安全性」点「仍要打开」；"
+            echo "- Windows：SmartScreen 里点「更多信息」→「仍要运行」。"
+            echo
+            echo "## 变更"
+            echo
+            git log --no-merges --pretty=format:'- %s' "$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo HEAD~10)..HEAD" 2>/dev/null || git log --no-merges --pretty=format:'- %s' -n 20
+          } > release-notes.md
+          cat release-notes.md
+
       - name: 创建 GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "$GITHUB_REF_NAME" dist/*.zip \
             --title "AItrans $GITHUB_REF_NAME" \
-            --generate-notes \
-            --notes "未签名版本。首次打开需要手动放行：macOS 右键打开或到「隐私与安全性」允许；Windows 在 SmartScreen 里点「更多信息 → 仍要运行」。"
+            --notes-file release-notes.md
