@@ -66,3 +66,13 @@ Windows 端保持一一对应的模块划分，便于逐项对照。
 | 文件路径 | 受浏览器限制，需服务端代写 | 直接读写 |
 | CLI 入口 | `legacy/` 四个脚本 | 新 GUI 不含；仓库保留 |
 | 更新 | 手动 | 应用内检查 + 下载安装 |
+
+## 6. 测试策略
+
+| 层次 | 方式 | 何时跑 |
+| --- | --- | --- |
+| 行为等价 | 两端读同一批 `fixtures/`，逐块比对 | 每次 CI |
+| 重试与错误分类 | Swift 用 `URLProtocol` 桩，C# 用假 `IChatCompleter` | 每次 CI |
+| 真实接口 | `AITRANS_LIVE_TEST=1 AITRANS_LIVE_KEY=… swift test --filter LiveAPITests` | 本地手动 |
+
+真实接口测试默认跳过（CI 不设环境变量），避免把密钥和网络依赖带进流水线。
