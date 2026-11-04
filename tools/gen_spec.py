@@ -221,7 +221,7 @@ def render_csharp(prompts: dict, presets: dict, parsing: dict) -> str:
 
     public const int RetryDelayBaseSeconds = {retry["delayBaseSeconds"]};
     public static readonly int[] RetryableHttpStatuses = {{ {", ".join(str(s) for s in retry["retryableHttpStatuses"])} }};
-    public const int RetryableHttpStatusAtLeast = {retry["retryableHTTPStatusAtLeast"]};
+    public const int RetryableHttpStatusAtLeast = {retry["retryableHttpStatusAtLeast"]};
 
     public const string ThinkingHostKeyword = {csharp_string(thinking["defaultWhenHostContains"])};
     public const string ThinkingOverrideEnvVar = {csharp_string(thinking["overrideEnvVar"])};

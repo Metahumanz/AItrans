@@ -53,7 +53,7 @@ jobs:
         id: detect
         shell: bash
         run: |
-          if [ -f windows/AITrans.sln ]; then
+          if [ -f windows/AITrans.Core.Tests/AITrans.Core.Tests.csproj ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
           else
             echo "found=false" >> "$GITHUB_OUTPUT"
@@ -67,5 +67,4 @@ jobs:
 
       - name: 测试
         if: steps.detect.outputs.found == 'true'
-        working-directory: windows
-        run: dotnet test -c Release
+        run: dotnet test windows/AITrans.Core.Tests/AITrans.Core.Tests.csproj -c Release
