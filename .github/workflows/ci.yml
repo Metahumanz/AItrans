@@ -6,6 +6,15 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    name: 工作流语法检查
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color
+
   spec:
     name: 契约与黄金样本
     runs-on: ubuntu-latest
