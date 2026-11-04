@@ -601,8 +601,9 @@
         <div class="tip">
           <i class="tip-icon">i</i>
           <div>
-            拖入文件夹时，Chrome / Edge 可自动把结果写回原目录；拖入单个文件或使用其他浏览器时，
-            结果会提供下载。需要直接保存到源文件目录时，优先使用「选择文件」或「选择文件夹」。
+            拖入的文件如果没能自动落回原目录（单个文件、Safari / Firefox、刷新过页面），
+            点结果上方的「写回文件夹…」选一个目录，本地服务会按原结构复制过去；
+            要直接写进源目录，用「选择文件」或「选择文件夹」。
           </div>
         </div>
       </section>
@@ -619,6 +620,10 @@
         </div>
         <div class="job-empty" id="jobEmpty">添加 SRT 并点击「开始翻译」，任务日志会显示在这里。</div>
         <div class="log-box" id="logBox" hidden></div>
+        <div class="results-toolbar" id="resultsToolbar" hidden>
+          <span class="results-toolbar-text" id="resultsToolbarText"></span>
+          <button class="btn secondary small" id="writeBackBtn" type="button">写回文件夹…</button>
+        </div>
         <div class="results" id="results"></div>
       </section>
     </div>
@@ -789,6 +794,9 @@
     jobEmpty: $("#jobEmpty"),
     logBox: $("#logBox"),
     results: $("#results"),
+    resultsToolbar: $("#resultsToolbar"),
+    resultsToolbarText: $("#resultsToolbarText"),
+    writeBackBtn: $("#writeBackBtn"),
     pathsText: $("#pathsText"),
     quitBtn: $("#quitBtn"),
     dropOverlay: $("#dropOverlay"),
@@ -815,8 +823,26 @@
   let providerBusy = false;
   let selectedProviderId = null;
   let keyVisible = false;
+  let writeBackBusy = false;
   const dirHandles = new Map();
   const savedBack = new Set();
+
+  // 刷新页面后仍记得哪些结果已经写回，避免重复提示。
+  function loadSavedBack() {
+    try {
+      for (const key of JSON.parse(sessionStorage.getItem("aitrans.savedBack") || "[]")) {
+        savedBack.add(key);
+      }
+    } catch {}
+  }
+
+  function persistSavedBack(key) {
+    savedBack.add(key);
+    try {
+      sessionStorage.setItem("aitrans.savedBack", JSON.stringify([...savedBack].slice(-200)));
+    } catch {}
+  }
+  loadSavedBack();
 
   // ---------- 基础 ----------
 
@@ -1894,33 +1920,36 @@
     }
     writtenJobId = currentJob.id;
     let written = 0;
-    for (const result of pending) {
-      const relative = resultWriteName(result);
-      try {
-        const handle = dirHandles.get(result.batch_id);
-        const response = await fetch(downloadUrl(result.download_id));
-        if (!response.ok) throw new Error("下载结果失败");
-        const blob = await response.blob();
-        const parts = relative.split("/").filter((part) => part && part !== "." && part !== "..");
-        if (!parts.length) throw new Error("结果文件名为空");
-        let targetDir = handle;
-        for (const part of parts.slice(0, -1)) {
-          targetDir = await targetDir.getDirectoryHandle(part, { create: true });
+    writeBackBusy = true;
+    try {
+      for (const result of pending) {
+        const relative = resultWriteName(result);
+        try {
+          const handle = dirHandles.get(result.batch_id);
+          const response = await fetch(downloadUrl(result.download_id));
+          if (!response.ok) throw new Error("下载结果失败");
+          const blob = await response.blob();
+          const parts = relative.split("/").filter((part) => part && part !== "." && part !== "..");
+          if (!parts.length) throw new Error("结果文件名为空");
+          let targetDir = handle;
+          for (const part of parts.slice(0, -1)) {
+            targetDir = await targetDir.getDirectoryHandle(part, { create: true });
+          }
+          const fileHandle = await targetDir.getFileHandle(parts[parts.length - 1], { create: true });
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          persistSavedBack(savedBackKey(result, currentJob));
+          written += 1;
+        } catch (error) {
+          showToast(`无法写回 ${relative}：${error.message}`, "warning", 6000);
         }
-        const fileHandle = await targetDir.getFileHandle(parts[parts.length - 1], { create: true });
-        const writable = await fileHandle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        savedBack.add(savedBackKey(result, currentJob));
-        written += 1;
-      } catch (error) {
-        showToast(`无法写回 ${relative}：${error.message}`, "warning", 6000);
       }
+    } finally {
+      writeBackBusy = false;
     }
-    if (written) {
-      showToast(`已把 ${written} 个结果写回拖入的文件夹`, "success", 5000);
-      renderResults();
-    }
+    if (written) showToast(`已把 ${written} 个结果写回拖入的文件夹`, "success", 5000);
+    renderResults();
   }
 
   async function refreshStatus() {
@@ -1946,6 +1975,8 @@
       els.logBox.hidden = true;
       els.logBox.textContent = "";
       els.results.innerHTML = "";
+      els.resultsToolbar.hidden = true;
+      els.resultsToolbarText.textContent = "";
       els.cancelBtn.hidden = true;
       updateQueueHint();
       setBusy(busy);
@@ -1984,7 +2015,70 @@
     setBusy(busy);
   }
 
+  function pendingWriteBackResults(targetJob = job) {
+    if (writeBackBusy || !targetJob || !targetJob.results || targetJob.status === "running") return [];
+    return targetJob.results.filter(
+      (result) =>
+        result.download_id &&
+        ["success", "skipped"].includes(result.status) &&
+        !savedBack.has(savedBackKey(result, targetJob)),
+    );
+  }
+
+  function renderResultsToolbar() {
+    const pending = pendingWriteBackResults();
+    if (!pending.length) {
+      els.resultsToolbar.hidden = true;
+      els.resultsToolbarText.textContent = "";
+      return;
+    }
+    els.resultsToolbar.hidden = false;
+    els.resultsToolbarText.textContent =
+      `${pending.length} 个结果还没写回源目录（拖入的文件拿不到源路径）。` +
+      "选一个文件夹，本地服务会按原目录结构复制过去。";
+  }
+
+  async function writeBackToFolder() {
+    if (busy) return;
+    const pending = pendingWriteBackResults();
+    if (!pending.length) return;
+    const label = els.writeBackBtn.textContent;
+    setBusy(true);
+    els.writeBackBtn.textContent = "选择文件夹…";
+    try {
+      const picked = await api("/api/pick", { method: "POST", body: { kind: "folder" } });
+      if (picked.canceled) return;
+      const dir = (picked.paths || [])[0];
+      if (!dir) return;
+      const data = await api("/api/writeback", {
+        method: "POST",
+        body: { dir, job_id: job && job.id },
+      });
+      const outcome = data.writeback || {};
+      const written = new Set(outcome.written || []);
+      let saved = 0;
+      for (const result of pending) {
+        if (written.has(resultWriteName(result))) {
+          persistSavedBack(savedBackKey(result));
+          saved += 1;
+        }
+      }
+      if (saved) showToast(`已写回 ${saved} 个结果到 ${outcome.dir || dir}`, "success", 5000);
+      const skipped = outcome.skipped || [];
+      if (skipped.length) {
+        showToast(`有 ${skipped.length} 个未写回：${skipped[0]}`, "warning", 6000);
+      }
+      renderResults();
+    } catch (error) {
+      showToast(error.message, "error", 6000);
+    } finally {
+      els.writeBackBtn.textContent = label;
+      setBusy(false);
+    }
+  }
+
   function renderResults() {
+    renderResultsToolbar();
     els.results.innerHTML = "";
     if (!job || !job.results || !job.results.length) return;
     for (const result of job.results) {
@@ -2116,6 +2210,7 @@
   els.clearFilesBtn.addEventListener("click", clearFiles);
   els.startBtn.addEventListener("click", startJob);
   els.cancelBtn.addEventListener("click", cancelJob);
+  els.writeBackBtn.addEventListener("click", writeBackToFolder);
   els.quitBtn.addEventListener("click", quitApp);
   els.pickOutputBtn.addEventListener("click", async () => {
     if (busy) return;

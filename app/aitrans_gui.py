@@ -194,6 +194,19 @@ def _platform_name():
     return "linux"
 
 
+def _safe_relative_name(value):
+    """把浏览器给的相对路径收敛成安全的子路径，禁止 .. 与盘符。"""
+    parts = []
+    for part in str(value or "").replace("\\", "/").split("/"):
+        clean = part.strip()
+        if not clean or clean in {".", ".."}:
+            continue
+        if ":" in clean or any(ord(character) < 32 for character in clean):
+            continue
+        parts.append(clean)
+    return "/".join(parts)
+
+
 def _relative_write_name(relative_name, file_name):
     """把上传文件的相对路径换成新文件名，保留其所在子目录。
 
@@ -1009,6 +1022,71 @@ return output
             raise GuiError("文件不存在或已被删除。")
         return path
 
+    def write_back(self, raw_dir, job_id=None):
+        """把上传任务的结果复制到用户选择的文件夹。
+
+        浏览器拖拽给不出源目录，也无法在 Safari / Firefox 里回写；
+        这里改由本地服务端复制，Windows 与 macOS 表现一致。
+        """
+        if not isinstance(raw_dir, str) or not raw_dir.strip():
+            raise GuiError("请选择要写回的文件夹。")
+        target_root = Path(raw_dir).expanduser()
+        if not target_root.exists():
+            raise GuiError(f"文件夹不存在：{target_root}")
+        if not target_root.is_dir():
+            raise GuiError(f"不是文件夹：{target_root}")
+
+        upload_root = self.upload_root.resolve()
+        with self.lock:
+            job = self.job
+            if job is None:
+                raise GuiError("还没有可写回的结果。")
+            if job_id and job["id"] != str(job_id):
+                raise GuiError("任务已更新，请重新运行后再写回。")
+            if job["status"] == "running":
+                raise GuiError("任务仍在进行，请等待完成后再写回。")
+            pending = []
+            for result in job["results"]:
+                if result.get("status") not in {"success", "skipped"}:
+                    continue
+                entry = self.downloads.get(result.get("download_id"))
+                if entry:
+                    pending.append((result, Path(entry["path"])))
+
+        if not pending:
+            raise GuiError("没有需要写回的结果。")
+
+        written = []
+        skipped = []
+        for result, source in pending:
+            name = _safe_relative_name(
+                result.get("relative_name") or result.get("output_name")
+            )
+            if not name:
+                skipped.append(f"{result.get('name') or '结果'}：文件名无效")
+                continue
+            try:
+                resolved = source.resolve()
+                resolved.relative_to(upload_root)
+            except (OSError, ValueError):
+                skipped.append(f"{name}：源文件不在临时目录中")
+                continue
+            if not resolved.exists():
+                skipped.append(f"{name}：临时文件已被清理")
+                continue
+            try:
+                destination = target_root / name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(resolved, destination)
+            except OSError as error:
+                skipped.append(f"{name}：{error}")
+                continue
+            written.append(name)
+
+        if not written and skipped:
+            raise GuiError(f"没有写回任何文件：{skipped[0]}")
+        return {"dir": str(target_root), "written": written, "skipped": skipped}
+
     def reveal(self, raw_path):
         if not isinstance(raw_path, str) or not raw_path.strip():
             raise GuiError("缺少文件路径。")
@@ -1247,6 +1325,12 @@ class Handler(BaseHandler):
                 result = {"job": app.cancel_job()}
             elif path == "/api/pick":
                 result = app.pick_paths(str(payload.get("kind") or "files"))
+            elif path == "/api/writeback":
+                result = {
+                    "writeback": app.write_back(
+                        payload.get("dir"), payload.get("job_id")
+                    )
+                }
             elif path == "/api/reveal":
                 app.reveal(payload.get("path"))
                 result = {}
