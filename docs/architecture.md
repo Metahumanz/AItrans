@@ -44,6 +44,8 @@ app/ web/ legacy/     v1 Python 实现，保留作 CLI 与迁移参考
 | `Translator.swift` | 并发翻译、分批润色 | 依赖 ChatClient 抽象 |
 | `AITransApp` | SwiftUI 界面 | 手工验证 |
 
+Windows 端保持一一对应的模块划分（`AITrans.Core` / `AITrans.App`），便于逐项对照。
+
 Windows 端保持一一对应的模块划分，便于逐项对照。
 
 ## 4. 行为契约（必须与 v1 一致）

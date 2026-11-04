@@ -1,7 +1,7 @@
 # Windows 端验证清单
 
 > 用途：你在 Windows 机器上验证时按此逐项勾选，把失败项连同日志反馈。
-> 状态：`windows/AITrans.Core` 已落地并通过 CI 测试；WinUI 界面尚未开始，本清单先固化验收口径。
+> 状态：`windows/AITrans.Core` 与 WinUI 3 客户端均已落地，CI 能编译并打出 zip；尚未在真实 Windows 桌面上人工跑过，本清单就是待勾选的部分。
 
 ## 0. 环境
 
@@ -12,12 +12,17 @@
 ## 1. 构建
 
 ```bat
-dotnet build windows/AITrans.Core/AITrans.Core.csproj -c Release
 dotnet test windows/AITrans.Core.Tests/AITrans.Core.Tests.csproj -c Release
+dotnet build windows/AITrans.App/AITrans.App.csproj -c Release -p:Platform=x64
+
+:: 生成可分发的 zip
+dotnet publish windows/AITrans.App/AITrans.App.csproj ^
+  -c Release -r win-x64 --self-contained true -p:Version=0.0.1 -o windows\dist\app
 ```
 
-- [ ] 构建无警告失败
-- [ ] 单元测试全绿（与 macOS 同一批 `fixtures/`）
+- [ ] 构建无错误
+- [ ] 单元测试全绿（与 macOS 同一批 `fixtures/`，当前 31 个）
+- [ ] `windows\dist\app\AITrans.exe` 能启动并显示主窗口
 
 ## 2. 编码与解析
 
