@@ -775,11 +775,6 @@ class App:
                 command.extend(["--output-dir", str(output.parent)])
 
             environment = os.environ.copy()
-            try:
-                # 以磁盘上的 .env 为准，避免界面里切换提供商后子进程仍用旧值。
-                environment.update(pc.read_env_file())
-            except pc.ConfigError:
-                pass
             environment["PYTHONUNBUFFERED"] = "1"
             environment["PYTHONDONTWRITEBYTECODE"] = "1"
             # 固定子进程输出编码，避免 Windows 控制台代码页导致日志乱码。
