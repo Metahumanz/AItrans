@@ -139,6 +139,29 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(clean.ollamaModel, "qwen2.5")
     }
 
+    func testReplacePersistsSanitizedValues() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "aitrans-replace-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let path = dir.appending(path: "settings.json")
+        let store = SettingsStore()
+        var changed = store.settings
+        changed.apiWorkers = 999
+        changed.apiRetries = 9
+
+        store.replace(with: changed)
+        try store.save(to: path)
+
+        XCTAssertEqual(store.settings.apiWorkers, 64)
+        XCTAssertEqual(store.settings.apiRetries, 5)
+
+        let reloaded = SettingsStore()
+        try reloaded.load(from: path)
+        XCTAssertEqual(reloaded.settings.apiWorkers, 64)
+        XCTAssertEqual(reloaded.settings.apiRetries, 5)
+    }
+
     func testRoundTripUsesContractKeys() throws {
         let dir = FileManager.default.temporaryDirectory.appending(path: "aitrans-settings-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

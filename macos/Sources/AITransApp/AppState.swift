@@ -62,6 +62,21 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// 把界面上的设置写回存储；顺带把越界值收敛后再回填界面。
+    func persistSettings() {
+        settingsStore.replace(with: settings)
+        do {
+            try settingsStore.save(to: AppPaths.settingsFile)
+        } catch {
+            alertMessage = "保存设置失败：\(error.localizedDescription)"
+            return
+        }
+        // save() 内部会做取值收敛，把结果同步回界面。
+        if settings != settingsStore.settings {
+            settings = settingsStore.settings
+        }
+    }
+
     // MARK: - 文件
 
     func addFiles(_ urls: [URL]) {
@@ -145,12 +160,8 @@ final class AppState: ObservableObject {
             return
         }
 
-        do {
-            try settingsStore.save(to: AppPaths.settingsFile)
-        } catch {
-            alertMessage = "保存设置失败：\(error.localizedDescription)"
-            return
-        }
+        persistSettings()
+        if alertMessage != nil { return }
 
         let client: any ChatCompleting
         if usesOllama {

@@ -32,6 +32,11 @@ public final class SettingsStore: @unchecked Sendable {
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
+    /// 用外部传入的设置替换当前值（会先收敛）。
+    public func replace(with newSettings: AppSettings) {
+        settings = Self.sanitize(newSettings)
+    }
+
     public func update(_ mutate: (inout AppSettings) -> Void) {
         mutate(&settings)
         settings = Self.sanitize(settings)

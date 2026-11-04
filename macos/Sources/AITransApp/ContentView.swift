@@ -60,7 +60,7 @@ struct ContentView: View {
             Text(state.alertMessage ?? "")
         }
         .onChange(of: state.settings) { _, _ in
-            try? state.settingsStore.save(to: AppPaths.settingsFile)
+            state.persistSettings()
         }
     }
 
@@ -260,8 +260,11 @@ struct ContentView: View {
             }
 
             Section("并发与重试") {
-                Stepper("并发 \(state.settings.apiWorkers)", value: $state.settings.apiWorkers, in: 1...64)
-                Stepper("重试 \(state.settings.apiRetries)", value: $state.settings.apiRetries, in: 0...5)
+                NumberRow(title: "并发", value: $state.settings.apiWorkers, range: 1...64)
+                NumberRow(title: "重试", value: $state.settings.apiRetries, range: 0...5)
+                Text("可直接输入，也可以点右侧箭头微调。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("关于") {
@@ -355,5 +358,32 @@ private struct FileRow: View {
         case .skipped: return "已存在，跳过"
         case .failed: return result.error ?? "失败"
         }
+    }
+}
+
+
+/// 可输入也可步进的数字行。
+private struct NumberRow: View {
+    let title: String
+    @Binding var value: Int
+    let range: ClosedRange<Int>
+
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer(minLength: 8)
+            TextField("", value: $value, format: .number)
+                .multilineTextAlignment(.trailing)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 56)
+                .onSubmit(clamp)
+            Stepper("", value: $value, in: range)
+                .labelsHidden()
+                .onChange(of: value) { _, _ in clamp() }
+        }
+    }
+
+    private func clamp() {
+        value = min(range.upperBound, max(range.lowerBound, value))
     }
 }
