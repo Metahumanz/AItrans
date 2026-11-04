@@ -8,22 +8,143 @@
     mc:Ignorable="d"
     Title="AITrans">
 
-    <Grid Padding="24" RowSpacing="12">
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBlock
-            Grid.Row="0"
-            Text="AITrans"
-            Style="{StaticResource TitleLargeTextBlockStyle}" />
+        <!-- 命令栏 -->
+        <Grid Grid.Row="0" Padding="16,12" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
 
-        <TextBlock
-            Grid.Row="1"
-            VerticalAlignment="Center"
-            HorizontalAlignment="Center"
-            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-            Text="原生客户端骨架（构建验证中）" />
+            <Button Grid.Column="0" Click="OnAddFiles">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE710;" FontSize="14" />
+                    <TextBlock Text="添加文件" />
+                </StackPanel>
+            </Button>
+
+            <Button Grid.Column="1" Click="OnAddFolder">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE8B7;" FontSize="14" />
+                    <TextBlock Text="添加文件夹" />
+                </StackPanel>
+            </Button>
+
+            <ComboBox
+                Grid.Column="2"
+                x:Name="ProviderCombo"
+                MinWidth="200"
+                PlaceholderText="选择提供商"
+                SelectionChanged="OnProviderChanged" />
+
+            <Button Grid.Column="4" Content="管理提供商…" Click="OnManageProviders" />
+
+            <Button
+                Grid.Column="5"
+                x:Name="StartButton"
+                Style="{StaticResource AccentButtonStyle}"
+                Click="OnStart">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE768;" FontSize="14" />
+                    <TextBlock x:Name="StartButtonText" Text="开始" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <!-- 主体 -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0" Margin="16,0,0,0">
+                <ListView
+                    x:Name="FileList"
+                    SelectionMode="Extended"
+                    AllowDrop="True"
+                    DragOver="OnFileListDragOver"
+                    Drop="OnFileListDrop"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8" />
+
+                <StackPanel
+                    x:Name="EmptyState"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="8">
+                    <FontIcon
+                        Glyph="&#xE8B7;"
+                        FontSize="40"
+                        Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                    <TextBlock
+                        Text="把 .srt 文件或文件夹拖到这里"
+                        HorizontalAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+            </Grid>
+
+            <!-- 设置面板 -->
+            <ScrollViewer
+                Grid.Column="1"
+                Width="340"
+                Padding="16,0,16,0"
+                VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="翻译" Style="{StaticResource SubtitleTextBlockStyle}" />
+
+                    <ComboBox x:Name="EngineCombo" Header="引擎" MinWidth="280" SelectionChanged="OnEngineChanged" />
+                    <TextBox x:Name="ModelBox" Header="模型" PlaceholderText="deepseek-flash" />
+                    <ComboBox x:Name="LanguageCombo" Header="目标语言" MinWidth="280" />
+
+                    <ToggleSwitch x:Name="PolishSwitch" Header="润色" OnContent="开启" OffContent="关闭" IsOn="True" />
+                    <ToggleSwitch x:Name="ForceSwitch" Header="强制重新处理" OnContent="开启" OffContent="关闭" />
+
+                    <TextBlock Text="输出" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,8,0,0" />
+                    <ComboBox x:Name="OutputCombo" Header="位置" MinWidth="280" SelectionChanged="OnOutputModeChanged" />
+                    <TextBox x:Name="SuffixBox" Header="文件名后缀" Text="_translated" />
+                    <StackPanel x:Name="CustomDirPanel" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
+                        <TextBox x:Name="CustomDirBox" Header="自定义目录" Width="220" />
+                        <Button Content="选择…" Click="OnChooseCustomDir" VerticalAlignment="Bottom" />
+                    </StackPanel>
+
+                    <TextBlock Text="并发与重试" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,8,0,0" />
+                    <NumberBox x:Name="WorkersBox" Header="并发数" Minimum="1" Maximum="64" Value="20" SpinButtonPlacementMode="Compact" />
+                    <NumberBox x:Name="RetriesBox" Header="重试次数" Minimum="0" Maximum="5" Value="2" SpinButtonPlacementMode="Compact" />
+
+                    <TextBlock Text="关于" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,8,0,0" />
+                    <TextBlock x:Name="VersionText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="检查更新…" Click="OnCheckUpdates" />
+                        <Button Content="打开输出目录" Click="OnOpenOutput" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- 状态栏 -->
+        <Grid Grid.Row="2" Padding="16,10" RowSpacing="6">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <ProgressBar x:Name="JobProgressBar" Grid.Row="0" />
+            <TextBlock
+                x:Name="StatusText"
+                Grid.Row="1"
+                Text="拖入 .srt 文件或文件夹开始"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Grid>
     </Grid>
 </Window>
