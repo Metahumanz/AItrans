@@ -459,6 +459,8 @@ def write_env_file(store, path=ENV_PATH):
     sections.append("\n".join(block))
     content = "\n\n".join(sections) + "\n"
     _atomic_write(path, content, 0o600)
+    # 让当前进程立即使用新配置；图形界面切换提供商后无需重启。
+    load_env_file(path, override=True)
 
 
 def set_active_api_key(api_key):
