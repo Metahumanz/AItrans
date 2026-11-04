@@ -1,0 +1,89 @@
+name: Release Windows
+
+# 只负责 Windows 产物。与 macOS 工作流相互独立：
+# 任何一方排队或失败，都不影响另一方发布。
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要发布的 tag（例如 v0.1.1）"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows 产物
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: 解析版本
+        id: meta
+        shell: bash
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: 测试
+        run: dotnet test windows/AITrans.Core.Tests/AITrans.Core.Tests.csproj -c Release
+
+      - name: 发布并打包
+        shell: bash
+        working-directory: windows
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          dotnet publish AITrans.App/AITrans.App.csproj \
+            -c Release -r win-x64 --self-contained true \
+            -p:Version="$VERSION" -o dist/app
+          cd dist/app && 7z a -tzip "../AITrans-${VERSION}-win-x64.zip" . > /dev/null
+          ls -l ../*.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-dist
+          path: windows/dist/*.zip
+          if-no-files-found: error
+
+      - name: 生成更新说明
+        shell: bash
+        run: |
+          {
+            echo "未签名版本，首次打开需要手动放行："
+            echo
+            echo "- macOS：右键点 App →「打开」，或到「系统设置 → 隐私与安全性」点「仍要打开」；"
+            echo "- Windows：SmartScreen 里点「更多信息」→「仍要运行」。"
+            echo
+            echo "## 变更"
+            echo
+            git log --no-merges --pretty=format:'- %s' "$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo HEAD~10)..HEAD" 2>/dev/null || git log --no-merges --pretty=format:'- %s' -n 20
+          } > release-notes.md
+
+      - name: 发布
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release 已存在，补传 Windows 产物"
+            gh release upload "$TAG" windows/dist/*.zip --clobber
+          else
+            # 两个平台可能同时创建，失败则退回补传。
+            gh release create "$TAG" windows/dist/*.zip \
+              --title "AItrans $TAG" --notes-file release-notes.md \
+              || gh release upload "$TAG" windows/dist/*.zip --clobber
+          fi
+          gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.size)"'
