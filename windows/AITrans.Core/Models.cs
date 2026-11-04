@@ -6,13 +6,13 @@ public sealed record ProviderPreset(string Id, string Name, string BaseUrl, stri
 
 public sealed class Provider
 {
-    public string Id { get; set; } = "";
-    public string Name { get; set; } = "";
+    [JsonPropertyName("id")] public string Id { get; set; } = "";
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
 
     [JsonPropertyName("base_url")]
     public string BaseUrl { get; set; } = "";
 
-    public string Model { get; set; } = "";
+    [JsonPropertyName("model")] public string Model { get; set; } = "";
 
     [JsonPropertyName("api_key")]
     public string ApiKey { get; set; } = "";
