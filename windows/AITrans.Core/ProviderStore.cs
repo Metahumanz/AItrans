@@ -223,7 +223,8 @@ public sealed class ProviderStore
 
         foreach (var provider in file.Providers)
         {
-            // 旧文件可能有明文 key：迁移到加密存储。
+            // Windows 的 DPAPI 不会弹授权框，启动时直接解密并迁移旧明文；
+            // macOS 因钥匙串 ACL 授权框改为按需读取，两端策略不同是有意为之。
             if (!string.IsNullOrEmpty(provider.ApiKey))
             {
                 _secrets.Set(provider.Id, provider.ApiKey);

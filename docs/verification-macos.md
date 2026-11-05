@@ -16,7 +16,7 @@ swift test
 open dist/AITrans.app
 ```
 
-- [x] 测试全绿（当前 49 个，2 个跳过）
+- [x] 测试全绿（当前 53 个，其中 2 个真实接口用例默认跳过）
 - [x] 打包生成 `macos/dist/AITrans.app` 与 zip
 - [x] 启动后出现主窗口（本机用 `open` 验证，窗口 900×612）
 - [ ] 双击启动后菜单栏显示 AITrans
@@ -74,7 +74,7 @@ open dist/AITrans.app
 - [ ] 切换当前提供商后立即生效
 - [ ] 「测试连接」对错误 Key 返回鉴权失败
 - [x] API Key 保存在 `~/Library/Application Support/AITrans/secrets.json`（0600），`providers.json` 中无明文
-- [x] 启动时不读 `secrets.json`；首次开始任务、测试连接或打开提供商编辑面板时才读取
+- [x] 正常启动不读 `secrets.json`；首次开始任务、测试连接或打开提供商编辑面板时才读取。若检测到旧版明文 key，启动阶段会读写一次以完成迁移
 - [x] 删除提供商时对应 key 从 `secrets.json` 移除
 - [ ] 旧钥匙串条目不参与读取；升级后需要重新填写一次 API Key
 - [ ] 「从旧版导入…」能导入 v1 的 `providers.json`
@@ -104,11 +104,11 @@ open dist/AITrans.app
 
 已验证：
 
-- 本地 `swift test --disable-sandbox`：49 个测试执行，0 失败，2 个跳过。
+- 本地 `swift test --disable-sandbox`：53 个测试执行，0 失败，2 个跳过。
 - `package-app.sh 0.3.2` 能生成 `AITrans.app`、zip 和 dmg。
 - Release v0.3.2 的 dmg 能挂载：UDZO/UDIF、尾部 `koly`、卷内 `Applications -> /Applications` 软链、App 版本 0.3.2、ad-hoc 签名校验通过。
 - 用真实配置启动 v0.3.2：主窗口 900×612，启动阶段不读密钥，无授权框。
-- v0.3.2 起 macOS 密钥保存在本地 `secrets.json`（0600）：启动只解析 `providers.json`，开始任务、测试连接、打开提供商编辑面板时才按需读取。
+- v0.3.2 起 macOS 密钥保存在本地 `secrets.json`（明文，0600）：正常启动只解析 `providers.json`；检测到旧版明文 key 时会在载入后立即迁移；开始任务、测试连接、打开提供商编辑面板时才按需读取。
 
 已知限制：
 

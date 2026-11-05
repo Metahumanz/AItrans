@@ -62,6 +62,16 @@ final class AppState: ObservableObject {
             activeProviderID = providerStore.activeID
         } catch {
             alertMessage = error.localizedDescription
+            return
+        }
+
+        // 旧版 providers.json 里的明文 key 在载入后立刻迁移，避免只翻译不改配置的用户一直留着明文。
+        // 迁移失败不阻塞启动：明文仍留在内存里可用，下次启动再试。
+        do {
+            try providerStore.migratePlaintextKeys(to: AppPaths.providersFile)
+            providers = providerStore.providers
+        } catch {
+            alertMessage = "迁移旧版明文 API Key 失败：\(error.localizedDescription)"
         }
     }
 
@@ -270,14 +280,17 @@ final class AppState: ObservableObject {
         }
     }
 
-    func saveProvider(_ provider: Provider, activate: Bool) {
+    @discardableResult
+    func saveProvider(_ provider: Provider, activate: Bool) -> Provider? {
         do {
-            _ = try providerStore.upsert(provider, activate: activate)
+            let saved = try providerStore.upsert(provider, activate: activate)
             try providerStore.save(to: AppPaths.providersFile)
             providers = providerStore.providers
             activeProviderID = providerStore.activeID
+            return saved
         } catch {
             alertMessage = error.localizedDescription
+            return nil
         }
     }
 

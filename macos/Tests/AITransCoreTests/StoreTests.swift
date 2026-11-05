@@ -139,6 +139,47 @@ final class ProviderStoreTests: XCTestCase {
         XCTAssertEqual(try secrets.secret(for: "old"), "sk-plain", "保存时明文 key 应迁移到密钥存储")
     }
 
+    func testMigratePlaintextKeysRewritesProvidersFile() throws {
+        let path = tempDir.appending(path: "providers.json")
+        let legacy = """
+        {
+          "version": 1,
+          "active": "old",
+          "providers": [
+            {"id": "old", "name": "旧版", "base_url": "https://api.example.com", "model": "m", "api_key": "sk-plain", "requires_key": true}
+          ]
+        }
+        """
+        try legacy.write(to: path, atomically: true, encoding: .utf8)
+
+        let secrets = MemorySecretStore()
+        let store = ProviderStore(secrets: secrets)
+        try store.load(from: path)
+        let migrated = try store.migratePlaintextKeys(to: path)
+
+        XCTAssertEqual(migrated, 1)
+        XCTAssertEqual(try secrets.secret(for: "old"), "sk-plain")
+        XCTAssertEqual(store.provider(id: "old")?.apiKey, "", "迁移后内存里不应再保留明文")
+        XCTAssertEqual(try store.migratePlaintextKeys(to: path), 0, "重复迁移应为空操作")
+
+        let json = try String(contentsOf: path, encoding: .utf8)
+        XCTAssertFalse(json.contains("sk-plain"), "迁移后 providers.json 不应再有明文 key")
+        XCTAssertFalse(json.contains("api_key"))
+    }
+
+    func testUpsertWithoutKeyKeepsExistingSecret() throws {
+        let secrets = MemorySecretStore()
+        let store = ProviderStore(secrets: secrets)
+        _ = try store.upsert(sample(id: "acme"), activate: true)
+
+        var cleared = sample(id: "acme")
+        cleared.apiKey = ""
+        _ = try store.upsert(cleared)
+
+        XCTAssertEqual(try secrets.secret(for: "acme"), "sk-secret", "空 key 不应删除已有密钥")
+        XCTAssertEqual(store.provider(id: "acme")?.apiKey, "", "空 key 不应把旧密钥写回内存")
+    }
+
     func testFileSecretStoreRoundTripAndPermissions() throws {
         let path = tempDir.appending(path: "secrets.json")
         let store = FileSecretStore(path: path)
@@ -149,6 +190,12 @@ final class ProviderStoreTests: XCTestCase {
 
         let attributes = try FileManager.default.attributesOfItem(atPath: path.path)
         XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
+        let directoryAttributes = try FileManager.default.attributesOfItem(atPath: tempDir.path)
+        XCTAssertEqual(
+            (directoryAttributes[.posixPermissions] as? NSNumber)?.intValue,
+            0o700,
+            "密钥目录应在写入前收紧到 0700"
+        )
 
         try store.setSecret("", for: "deepseek")
         XCTAssertNil(try store.secret(for: "deepseek"), "空值应删除对应条目")
@@ -156,6 +203,29 @@ final class ProviderStoreTests: XCTestCase {
         try store.setSecret("sk-delete", for: "other")
         try store.deleteSecret(for: "other")
         XCTAssertNil(try store.secret(for: "other"))
+    }
+
+    func testMemorySecretStoreTreatsEmptyAsDelete() throws {
+        let store = MemorySecretStore()
+        try store.setSecret("sk-memory", for: "deepseek")
+        try store.setSecret("", for: "deepseek")
+        XCTAssertNil(try store.secret(for: "deepseek"), "内存实现应与文件实现一样把空值当作删除")
+    }
+
+    func testDeleteKeepsProviderWhenSecretDeletionFails() throws {
+        let providersPath = tempDir.appending(path: "providers.json")
+        let secretsPath = tempDir.appending(path: "secrets.json")
+
+        let writer = ProviderStore(secrets: MemorySecretStore())
+        _ = try writer.upsert(sample(id: "acme"), activate: true)
+        try writer.save(to: providersPath)
+        try "not json".write(to: secretsPath, atomically: true, encoding: .utf8)
+
+        let store = ProviderStore(secrets: FileSecretStore(path: secretsPath))
+        try store.load(from: providersPath)
+
+        XCTAssertThrowsError(try store.delete(id: "acme"))
+        XCTAssertNotNil(store.provider(id: "acme"), "删除密钥失败时不应把提供商从内存移除")
     }
 
     func testFileSecretStoreRejectsCorruptFile() throws {

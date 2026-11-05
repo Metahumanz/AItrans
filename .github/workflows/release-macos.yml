@@ -56,6 +56,11 @@ jobs:
             echo "- macOS：右键点 App →「打开」，或到「系统设置 → 隐私与安全性」点「仍要打开」；"
             echo "- Windows：SmartScreen 里点「更多信息」→「仍要运行」。"
             echo
+            echo '## 升级提示'
+            echo
+            echo '- macOS：v0.3.2 起 API Key 改存本地 `secrets.json`（明文，0600），不再使用钥匙串；从 v0.3.1 及更早版本升级后，旧钥匙串里的 Key 不会自动迁移，请在「提供商」里重新填写一次。'
+            echo '- Windows：密钥仍由 DPAPI 加密保存，无需操作。'
+            echo
             echo "## 变更"
             echo
             git log --no-merges --pretty=format:'- %s' "$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo HEAD~10)..HEAD" 2>/dev/null || git log --no-merges --pretty=format:'- %s' -n 20

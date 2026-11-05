@@ -4,6 +4,7 @@
 // 不使用 macOS 钥匙串：避免 ad-hoc 签名变化后每次升级都触发 ACL 授权框。
 // JSON 结构保持兼容，便于从旧文件导入。
 
+import Darwin
 import Foundation
 
 // MARK: - 密钥存储
@@ -36,36 +37,69 @@ public final class FileSecretStore: SecretStoring, @unchecked Sendable {
         return object
     }
 
-    private func save(_ values: [String: String]) throws {
+    private func ensurePrivateDirectory() throws {
         let directory = path.deletingLastPathComponent()
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        guard directory.path.hasPrefix("/") else {
+            throw AITransError("密钥文件路径必须是绝对路径：\(path.path)")
+        }
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        // 原子写会先在同目录生成临时文件。先把目录收紧到 0700，
+        // 临时文件在最终 chmod 之前也不会被其他用户读到。
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+    }
+
+    private func save(_ values: [String: String]) throws {
+        try ensurePrivateDirectory()
         let data = try JSONSerialization.data(withJSONObject: values, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: path, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path.path)
-        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+    }
+
+    /// 用跨进程文件锁包住读改写；NSLock 只能解决同进程内的并发。
+    private func withFileLock<T>(_ body: () throws -> T) throws -> T {
+        lock.lock()
+        defer { lock.unlock() }
+
+        try ensurePrivateDirectory()
+        let lockPath = path.path + ".lock"
+        let descriptor = open(lockPath, O_CREAT | O_RDWR, 0o600)
+        guard descriptor >= 0 else {
+            throw AITransError("无法打开密钥锁文件：\(lockPath)")
+        }
+        defer { close(descriptor) }
+        guard flock(descriptor, LOCK_EX) == 0 else {
+            throw AITransError("无法锁定密钥文件：\(lockPath)")
+        }
+        defer { _ = flock(descriptor, LOCK_UN) }
+        return try body()
     }
 
     public func secret(for id: String) throws -> String? {
-        lock.lock(); defer { lock.unlock() }
-        return try load()[id]
+        try withFileLock { try load()[id] }
     }
 
     public func setSecret(_ value: String, for id: String) throws {
-        lock.lock(); defer { lock.unlock() }
-        var values = try load()
-        if value.isEmpty {
-            values.removeValue(forKey: id)
-        } else {
-            values[id] = value
+        try withFileLock {
+            var values = try load()
+            if value.isEmpty {
+                values.removeValue(forKey: id)
+            } else {
+                values[id] = value
+            }
+            try save(values)
         }
-        try save(values)
     }
 
     public func deleteSecret(for id: String) throws {
-        lock.lock(); defer { lock.unlock() }
-        var values = try load()
-        if values.removeValue(forKey: id) != nil {
-            try save(values)
+        try withFileLock {
+            var values = try load()
+            if values.removeValue(forKey: id) != nil {
+                try save(values)
+            }
         }
     }
 }
@@ -84,7 +118,11 @@ public final class MemorySecretStore: SecretStoring, @unchecked Sendable {
 
     public func setSecret(_ value: String, for id: String) throws {
         lock.lock(); defer { lock.unlock() }
-        values[id] = value
+        if value.isEmpty {
+            values.removeValue(forKey: id)
+        } else {
+            values[id] = value
+        }
     }
 
     public func deleteSecret(for id: String) throws {
@@ -191,6 +229,7 @@ public final class ProviderStore: @unchecked Sendable {
     /// 按需从本地密钥文件补齐密钥。
     ///
     /// 启动时只读 providers.json，不碰 secrets.json；真正要发请求或编辑提供商时再调用这里。
+    /// 旧版明文 key 会在载入后由 `migratePlaintextKeys(to:)` 迁走。
     public func hydrate(_ provider: Provider) throws -> Provider {
         guard provider.apiKey.isEmpty, !provider.id.isEmpty else { return provider }
         var hydrated = provider
@@ -208,7 +247,8 @@ public final class ProviderStore: @unchecked Sendable {
 
     /// 读取 providers.json；只解析文件，不读取密钥。
     ///
-    /// 旧文件里的明文 `api_key` 会先留在内存里，等 `hydrate` 或 `save` 时再迁移。
+    /// 旧文件里的明文 `api_key` 会先留在内存里，由调用方在载入后调用
+    /// `migratePlaintextKeys(to:)` 迁移；`save` 也会兜底迁移。
     public func load(from url: URL) throws {
         guard FileManager.default.fileExists(atPath: url.path) else {
             providers = []
@@ -231,7 +271,7 @@ public final class ProviderStore: @unchecked Sendable {
                 apiKey: item["api_key"] as? String ?? "",
                 requiresKey: item["requires_key"] as? Bool ?? true
             )
-            // 旧文件里的明文 key 先留在内存里，避免启动时读取密钥文件。
+            // 旧文件里的明文 key 暂留内存，载入后由 migratePlaintextKeys 迁移。
             loaded.append(provider)
         }
         providers = loaded
@@ -241,9 +281,28 @@ public final class ProviderStore: @unchecked Sendable {
         }
     }
 
+    /// 把旧版 providers.json 里的明文 key 迁移到 secrets.json，并重写 providers.json。
+    ///
+    /// 返回迁移的条数。应在 `load` 之后、`hydrate` 之前调用；只处理内存里带 key 的条目，
+    /// 因此重复调用是安全的。
+    @discardableResult
+    public func migratePlaintextKeys(to url: URL) throws -> Int {
+        let pending = providers.filter { !$0.apiKey.isEmpty }
+        guard !pending.isEmpty else { return 0 }
+
+        for provider in pending {
+            try secrets.setSecret(provider.apiKey, for: provider.id)
+        }
+        for index in providers.indices where !providers[index].apiKey.isEmpty {
+            providers[index].apiKey = ""
+        }
+        try save(to: url)
+        return pending.count
+    }
+
     /// 保存 providers.json；密钥只进本地 secrets.json。
     ///
-    /// 旧文件里的明文 key 在这里迁移；启动加载时不读取密钥文件。
+    /// 内存里若还有明文 key（例如调用方没有先跑 `migratePlaintextKeys`），这里会兜底迁移。
     public func save(to url: URL) throws {
         for provider in providers where !provider.apiKey.isEmpty {
             try secrets.setSecret(provider.apiKey, for: provider.id)
@@ -276,13 +335,19 @@ public final class ProviderStore: @unchecked Sendable {
     public func upsert(_ provider: Provider, activate: Bool = false) throws -> Provider {
         let taken = Set(providers.filter { $0.id != provider.id }.map(\.id))
         let normalized = try ProviderValidation.normalize(provider, taken: taken)
+        let existingIndex = providers.firstIndex { $0.id == normalized.id }
 
-        if let index = providers.firstIndex(where: { $0.id == normalized.id }) {
-            providers[index] = normalized
+        // 空 key 表示“保留已有密钥”，不写入空值；旧密钥仍留在 secrets.json 里，
+        // 下次 hydrate 时再读取。这样也避免这里做一次跨两次加锁的读-改-写。
+        if !normalized.apiKey.isEmpty {
+            try secrets.setSecret(normalized.apiKey, for: normalized.id)
+        }
+
+        if let existingIndex {
+            providers[existingIndex] = normalized
         } else {
             providers.append(normalized)
         }
-        try secrets.setSecret(normalized.apiKey, for: normalized.id)
 
         if activate || activeID == nil {
             activeID = normalized.id
@@ -291,8 +356,10 @@ public final class ProviderStore: @unchecked Sendable {
     }
 
     public func delete(id: String) throws {
+        guard providers.contains(where: { $0.id == id }) else { return }
+        // 先删密钥：失败时保留提供商，避免留下无法再被清理的孤儿密钥。
+        try secrets.deleteSecret(for: id)
         providers.removeAll { $0.id == id }
-        try? secrets.deleteSecret(for: id)
         if activeID == id {
             activeID = providers.first?.id
         }

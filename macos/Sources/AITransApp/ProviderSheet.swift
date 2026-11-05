@@ -188,12 +188,9 @@ struct ProviderSheet: View {
             apiKey: draft.apiKey,
             requiresKey: draft.requiresKey
         )
-        state.saveProvider(candidate, activate: activate)
-        if let id = state.activeProviderID, isNew || activate {
-            selection = id
-        } else {
-            selection = state.providers.first { $0.name == candidate.name }?.id ?? selection
-        }
+        guard let saved = state.saveProvider(candidate, activate: activate) else { return }
+        // 新建后即使没有“保存并启用”，也应停在刚保存的提供商上，而不是跳回当前 active。
+        selection = saved.id
         isNew = false
         loadDraft()
     }
