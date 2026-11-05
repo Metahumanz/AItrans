@@ -1,6 +1,8 @@
 # 发布与更新
 
-> 状态：`v0.2.1` 已走通完整流程——tag 推送 → 双端构建 → 创建 Release，产物可下载。
+> 状态：`v0.3.0` 已走通完整流程——tag 推送 → 双端构建 → 创建 Release，产物可下载。
+> 仓库已设为**公开**，应用内的匿名检查更新（`api.github.com/repos/Metahumanz/AItrans/releases/latest`）
+> 才能拿到数据；如果以后改回私有，检查更新会静默失效。
 
 ## 1. 发布方式
 
@@ -42,7 +44,7 @@ git push origin v2.0.0
 发布工作流里自动编译，本地也可以直接跑：
 
 ```sh
-ISCC.exe /DMyAppVersion=0.2.1 /DSourceDir=..\dist\app windows\installer\AITrans.iss
+ISCC.exe /DMyAppVersion=0.3.0 /DSourceDir=..\dist\app windows\installer\AITrans.iss
 ```
 
 - 默认装到 `%LocalAppData%\Programs\AITrans`，**不需要管理员权限**；
