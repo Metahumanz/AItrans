@@ -301,7 +301,23 @@ final class AppState: ObservableObject {
             providers = providerStore.providers
             activeProviderID = providerStore.activeID
         } catch {
-            alertMessage = error.localizedDescription
+            alertMessage = "删除提供商失败：\(error.localizedDescription)\n"
+                + "如果密钥文件已损坏，可手动删除 \(AppPaths.secretsFile.path) 后重试。"
+        }
+    }
+
+    /// 清除某个提供商已保存的密钥，提供商本身保留。
+    @discardableResult
+    func clearProviderKey(id: String) -> Bool {
+        do {
+            try providerStore.clearSecret(for: id)
+            providers = providerStore.providers
+            statusText = "已清除该提供商的 API Key"
+            return true
+        } catch {
+            alertMessage = "清除 API Key 失败：\(error.localizedDescription)\n"
+                + "如果密钥文件已损坏，可手动删除 \(AppPaths.secretsFile.path) 后重试。"
+            return false
         }
     }
 

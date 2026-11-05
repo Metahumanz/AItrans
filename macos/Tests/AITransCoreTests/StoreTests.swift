@@ -212,6 +212,37 @@ final class ProviderStoreTests: XCTestCase {
         XCTAssertNil(try store.secret(for: "deepseek"), "内存实现应与文件实现一样把空值当作删除")
     }
 
+    func testSecretReadDoesNotCreateFiles() throws {
+        let directory = tempDir.appending(path: "not-created", directoryHint: .isDirectory)
+        let store = FileSecretStore(path: directory.appending(path: "secrets.json"))
+
+        XCTAssertNil(try store.secret(for: "deepseek"))
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: directory.path),
+            "读取不应创建目录或 secrets.json.lock"
+        )
+    }
+
+    func testSetEmptyOnMissingFileCreatesNothing() throws {
+        let directory = tempDir.appending(path: "still-missing", directoryHint: .isDirectory)
+        let store = FileSecretStore(path: directory.appending(path: "secrets.json"))
+
+        try store.setSecret("", for: "deepseek")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path), "清空空操作不应落盘")
+    }
+
+    func testClearSecretRemovesEntryAndKeepsProvider() throws {
+        let secrets = MemorySecretStore()
+        let store = ProviderStore(secrets: secrets)
+        _ = try store.upsert(sample(id: "acme"), activate: true)
+
+        try store.clearSecret(for: "acme")
+
+        XCTAssertNil(try secrets.secret(for: "acme"))
+        XCTAssertNotNil(store.provider(id: "acme"))
+        XCTAssertEqual(store.provider(id: "acme")?.apiKey, "")
+    }
+
     func testDeleteKeepsProviderWhenSecretDeletionFails() throws {
         let providersPath = tempDir.appending(path: "providers.json")
         let secretsPath = tempDir.appending(path: "secrets.json")

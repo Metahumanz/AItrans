@@ -118,6 +118,8 @@ struct ProviderSheet: View {
                         .keyboardShortcut("s", modifiers: .command)
                     Button("保存并启用") { save(activate: true) }
                     Spacer()
+                    Button("清除已保存的密钥") { clearKey() }
+                        .disabled(isNew || selection == nil)
                     Button("测试连接") { test() }
                         .disabled(isTesting || draft.baseURL.isEmpty)
                 }
@@ -212,5 +214,13 @@ struct ProviderSheet: View {
                 isTesting = false
             }
         }
+    }
+
+    /// 显式清除已保存的密钥。`save()` 里空 key 表示“保留”，所以清空必须走这里。
+    private func clearKey() {
+        guard let id = selection else { return }
+        guard state.clearProviderKey(id: id) else { return }
+        draft.apiKey = ""
+        testMessage = "已清除保存的密钥。"
     }
 }

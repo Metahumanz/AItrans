@@ -21,10 +21,23 @@ public protocol SecretStoring: AnyObject, Sendable {
 /// 代价是文件本身为明文，安全性依赖用户目录权限；这是为了摆脱 Keychain ACL 授权框做的取舍。
 public final class FileSecretStore: SecretStoring, @unchecked Sendable {
     private let path: URL
-    private let lock = NSLock()
+
+    /// 同进程内按路径共享锁：两个实例同时读改写时先在 NSLock 上排队，
+    /// 避免各自拿 flock 互相等待（flock 按 open file description 计，同进程不同 fd 也会阻塞）。
+    private static let registryLock = NSLock()
+    private static var sharedLocks: [String: NSLock] = [:]
 
     public init(path: URL = AppPaths.secretsFile) {
         self.path = path
+    }
+
+    private static func sharedLock(for path: String) -> NSLock {
+        registryLock.lock()
+        defer { registryLock.unlock() }
+        if let existing = sharedLocks[path] { return existing }
+        let created = NSLock()
+        sharedLocks[path] = created
+        return created
     }
 
     private func load() throws -> [String: String] {
@@ -59,8 +72,9 @@ public final class FileSecretStore: SecretStoring, @unchecked Sendable {
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path.path)
     }
 
-    /// 用跨进程文件锁包住读改写；NSLock 只能解决同进程内的并发。
+    /// 用跨进程文件锁包住读改写；同进程内先过共享 NSLock，避免两个实例互等。
     private func withFileLock<T>(_ body: () throws -> T) throws -> T {
+        let lock = Self.sharedLock(for: path.path)
         lock.lock()
         defer { lock.unlock() }
 
@@ -78,11 +92,15 @@ public final class FileSecretStore: SecretStoring, @unchecked Sendable {
         return try body()
     }
 
+    /// 读取不加锁、不创建目录或锁文件：写入是「临时文件 + rename」的原子替换，
+    /// 读到的要么是旧文件要么是新文件。这样打开提供商面板不会在磁盘上留下额外文件。
     public func secret(for id: String) throws -> String? {
-        try withFileLock { try load()[id] }
+        guard FileManager.default.fileExists(atPath: path.path) else { return nil }
+        return try load()[id]
     }
 
     public func setSecret(_ value: String, for id: String) throws {
+        if value.isEmpty, !FileManager.default.fileExists(atPath: path.path) { return }
         try withFileLock {
             var values = try load()
             if value.isEmpty {
@@ -95,6 +113,7 @@ public final class FileSecretStore: SecretStoring, @unchecked Sendable {
     }
 
     public func deleteSecret(for id: String) throws {
+        guard FileManager.default.fileExists(atPath: path.path) else { return }
         try withFileLock {
             var values = try load()
             if values.removeValue(forKey: id) != nil {
@@ -353,6 +372,16 @@ public final class ProviderStore: @unchecked Sendable {
             activeID = normalized.id
         }
         return normalized
+    }
+
+    /// 清除某个提供商已保存的密钥；提供商本身保留。
+    ///
+    /// `upsert` 把空 key 当作“保留已有密钥”，所以「清空密钥」必须走这个显式入口。
+    public func clearSecret(for id: String) throws {
+        try secrets.deleteSecret(for: id)
+        if let index = providers.firstIndex(where: { $0.id == id }) {
+            providers[index].apiKey = ""
+        }
     }
 
     public func delete(id: String) throws {
