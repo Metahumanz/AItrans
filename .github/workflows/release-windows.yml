@@ -46,8 +46,12 @@ jobs:
         run: |
           VERSION="${{ steps.meta.outputs.version }}"
           dotnet publish AITrans.App/AITrans.App.csproj \
-            -c Release -r win-x64 --self-contained true \
+            -c Release -r win-x64 --self-contained false \
             -p:Version="$VERSION" -o dist/app
+          # WinUI 的 XAML 资源不会被 dotnet publish 自动带上，缺了会启动即崩（0xC000027B）。
+          for f in AITrans.exe AITrans.pri App.xbf MainWindow.xbf; do
+            test -f "dist/app/$f" || { echo "publish 产物缺少 $f"; exit 1; }
+          done
           cd dist/app && 7z a -tzip "../AITrans-${VERSION}-win-x64.zip" . > /dev/null
           ls -l ../*.zip
 

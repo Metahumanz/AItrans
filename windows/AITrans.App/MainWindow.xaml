@@ -3,162 +3,615 @@
     x:Class="AITrans.App.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:AITrans.App"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
     Title="AITrans">
 
-    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid x:Name="Root">
+        <Grid.Resources>
+            <Style x:Key="CardStyle" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Padding" Value="16" />
+            </Style>
+            <Style x:Key="SectionHeaderStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyStrongTextBlockStyle}">
+                <Setter Property="Margin" Value="0,0,0,10" />
+            </Style>
+        </Grid.Resources>
+
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- 命令栏 -->
-        <Grid Grid.Row="0" Padding="16,12" ColumnSpacing="8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <Button Grid.Column="0" Click="OnAddFiles">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <FontIcon Glyph="&#xE710;" FontSize="14" />
-                    <TextBlock Text="添加文件" />
-                </StackPanel>
-            </Button>
-
-            <Button Grid.Column="1" Click="OnAddFolder">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <FontIcon Glyph="&#xE8B7;" FontSize="14" />
-                    <TextBlock Text="添加文件夹" />
-                </StackPanel>
-            </Button>
-
-            <ComboBox
-                Grid.Column="2"
-                x:Name="ProviderCombo"
-                MinWidth="200"
-                PlaceholderText="选择提供商"
-                SelectionChanged="OnProviderChanged" />
-
-            <Button Grid.Column="4" Content="管理提供商…" Click="OnManageProviders" />
-
-            <Button
-                Grid.Column="5"
-                x:Name="StartButton"
-                Style="{StaticResource AccentButtonStyle}"
-                Click="OnStart">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <FontIcon Glyph="&#xE768;" FontSize="14" />
-                    <TextBlock x:Name="StartButtonText" Text="开始" />
-                </StackPanel>
-            </Button>
-        </Grid>
-
-        <!-- 路径输入 -->
-        <Grid Grid.Row="1" Padding="16,0,16,8" ColumnSpacing="8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <TextBox
-                x:Name="PathBox"
-                PlaceholderText="粘贴文件或文件夹路径"
-                KeyDown="OnPathKeyDown" />
-            <Button Grid.Column="1" Content="添加" Click="OnAddPath" />
-        </Grid>
-
-        <!-- 主体 -->
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <Grid Grid.Column="0" Margin="16,0,0,0">
-                <ListView
-                    x:Name="FileList"
-                    SelectionMode="Extended"
-                    AllowDrop="True"
-                    DragOver="OnFileListDragOver"
-                    Drop="OnFileListDrop"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8" />
-
-                <StackPanel
-                    x:Name="EmptyState"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    Spacing="8">
+        <!-- 自定义标题栏 -->
+        <Grid
+            x:Name="AppTitleBar"
+            Grid.Row="0"
+            Height="48"
+            Padding="16,0,150,0">
+            <StackPanel
+                Orientation="Horizontal"
+                Spacing="10"
+                VerticalAlignment="Center">
+                <Border
+                    Width="22"
+                    Height="22"
+                    Background="{ThemeResource AccentFillColorDefaultBrush}"
+                    CornerRadius="6">
                     <FontIcon
-                        Glyph="&#xE8B7;"
-                        FontSize="40"
-                        Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                    <TextBlock
-                        Text="把 .srt 文件或文件夹拖到这里"
-                        HorizontalAlignment="Center"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                </StackPanel>
+                        Glyph="&#xE8C1;"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+                </Border>
+                <TextBlock
+                    Text="AITrans"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    VerticalAlignment="Center" />
+                <TextBlock
+                    Text="字幕翻译"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                    VerticalAlignment="Center" />
+            </StackPanel>
+        </Grid>
+
+        <NavigationView
+            x:Name="Nav"
+            Grid.Row="1"
+            CompactPaneLength="48"
+            IsBackButtonVisible="Collapsed"
+            IsSettingsVisible="False"
+            OpenPaneLength="212"
+            PaneDisplayMode="Left"
+            SelectionChanged="OnNavSelectionChanged">
+
+            <NavigationView.MenuItems>
+                <NavigationViewItem
+                    x:Name="TasksNavItem"
+                    Content="翻译任务"
+                    IsSelected="True"
+                    Tag="tasks">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8C8;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="提供商" Tag="providers">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE774;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+
+            <NavigationView.FooterMenuItems>
+                <NavigationViewItem Content="关于" Tag="about">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE946;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.FooterMenuItems>
+
+            <Grid>
+                <!-- ===================================================== 翻译任务 -->
+                <Grid
+                    x:Name="TasksPanel"
+                    Padding="24,8,24,20"
+                    RowSpacing="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="翻译任务" Style="{StaticResource TitleTextBlockStyle}" />
+                            <TextBlock
+                                Text="拖入或选择 SRT 字幕，批量翻译并润色"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <Button
+                            Grid.Column="1"
+                            Click="OnAddFiles"
+                            ToolTipService.ToolTip="添加 .srt 文件">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE710;" FontSize="14" />
+                                <TextBlock Text="添加文件" />
+                            </StackPanel>
+                        </Button>
+                        <Button
+                            Grid.Column="2"
+                            Click="OnAddFolder"
+                            ToolTipService.ToolTip="添加文件夹里的全部 .srt">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE8B7;" FontSize="14" />
+                                <TextBlock Text="添加文件夹" />
+                            </StackPanel>
+                        </Button>
+                        <Button
+                            Grid.Column="3"
+                            Click="OnClearFiles"
+                            ToolTipService.ToolTip="清空列表">
+                            <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                        </Button>
+                    </Grid>
+
+                    <Grid Grid.Row="1" ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="336" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 文件列表 -->
+                        <Border
+                            Grid.Column="0"
+                            Padding="0"
+                            Style="{StaticResource CardStyle}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid
+                                    Grid.Row="0"
+                                    AllowDrop="True"
+                                    DragOver="OnFileListDragOver"
+                                    Drop="OnFileListDrop">
+                                    <ListView
+                                        x:Name="FileList"
+                                        Padding="4"
+                                        SelectionMode="Extended">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="local:FileItem">
+                                                <Grid Padding="4,8" ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <FontIcon
+                                                        Grid.Column="0"
+                                                        FontSize="18"
+                                                        Foreground="{x:Bind GlyphBrush, Mode=OneWay}"
+                                                        Glyph="{x:Bind Glyph, Mode=OneWay}"
+                                                        VerticalAlignment="Center" />
+                                                    <StackPanel Grid.Column="1" Spacing="2">
+                                                        <TextBlock
+                                                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                                                            Text="{x:Bind Name}"
+                                                            TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock
+                                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                            Style="{StaticResource CaptionTextBlockStyle}"
+                                                            Text="{x:Bind Folder}"
+                                                            TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <TextBlock
+                                                        Grid.Column="2"
+                                                        VerticalAlignment="Center"
+                                                        Foreground="{x:Bind StatusBrush, Mode=OneWay}"
+                                                        Style="{StaticResource CaptionTextBlockStyle}"
+                                                        Text="{x:Bind StatusText, Mode=OneWay}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+
+                                    <StackPanel
+                                        x:Name="EmptyState"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        IsHitTestVisible="False"
+                                        Spacing="10">
+                                        <FontIcon
+                                            Glyph="&#xE8B7;"
+                                            FontSize="40"
+                                            Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                        <TextBlock
+                                            HorizontalAlignment="Center"
+                                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                                            Text="把 .srt 文件或文件夹拖到这里" />
+                                        <TextBlock
+                                            HorizontalAlignment="Center"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Style="{StaticResource CaptionTextBlockStyle}"
+                                            Text="也可以点右上角「添加文件」，或粘贴完整路径" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- 路径输入 -->
+                                <Grid
+                                    x:Name="PathBar"
+                                    Grid.Row="1"
+                                    Margin="12,0,12,12"
+                                    ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox
+                                        x:Name="PathBox"
+                                        KeyDown="OnPathKeyDown"
+                                        PlaceholderText="粘贴文件或文件夹的完整路径，回车添加" />
+                                    <Button
+                                        Grid.Column="1"
+                                        Content="添加"
+                                        Click="OnAddPath" />
+                                </Grid>
+                            </Grid>
+                        </Border>
+
+                        <!-- 任务设置 -->
+                        <ScrollViewer
+                            Grid.Column="1"
+                            VerticalScrollBarVisibility="Auto">
+                            <StackPanel Spacing="12">
+                                <Border Style="{StaticResource CardStyle}">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="翻译" />
+
+                                        <ComboBox
+                                            x:Name="EngineCombo"
+                                            Margin="0,0,0,12"
+                                            Header="引擎"
+                                            HorizontalAlignment="Stretch"
+                                            SelectionChanged="OnEngineChanged">
+                                            <ComboBoxItem Content="API 提供商" />
+                                            <ComboBoxItem Content="本地 Ollama" />
+                                        </ComboBox>
+
+                                        <TextBox
+                                            x:Name="ModelBox"
+                                            Margin="0,0,0,12"
+                                            Header="模型"
+                                            PlaceholderText="留空则使用提供商默认模型" />
+
+                                        <ComboBox
+                                            x:Name="LanguageCombo"
+                                            Margin="0,0,0,12"
+                                            Header="目标语言"
+                                            HorizontalAlignment="Stretch">
+                                            <ComboBoxItem Content="中文" />
+                                            <ComboBoxItem Content="英文" />
+                                            <ComboBoxItem Content="日文" />
+                                            <ComboBoxItem Content="韩文" />
+                                        </ComboBox>
+
+                                        <ToggleSwitch
+                                            x:Name="TranslateSwitch"
+                                            Header="翻译"
+                                            IsOn="True"
+                                            OffContent="不翻译"
+                                            OnContent="翻译原文" />
+                                        <ToggleSwitch
+                                            x:Name="PolishSwitch"
+                                            Header="润色"
+                                            IsOn="True"
+                                            OffContent="不润色"
+                                            OnContent="翻译后再润色" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource CardStyle}">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="输出" />
+
+                                        <ComboBox
+                                            x:Name="OutputCombo"
+                                            Margin="0,0,0,12"
+                                            Header="位置"
+                                            HorizontalAlignment="Stretch"
+                                            SelectionChanged="OnOutputModeChanged">
+                                            <ComboBoxItem Content="源文件目录" />
+                                            <ComboBoxItem Content="应用输出目录" />
+                                            <ComboBoxItem Content="自定义目录" />
+                                        </ComboBox>
+
+                                        <TextBox
+                                            x:Name="SuffixBox"
+                                            Margin="0,0,0,12"
+                                            Header="文件名后缀"
+                                            Text="_translated" />
+
+                                        <Grid
+                                            x:Name="CustomDirPanel"
+                                            Margin="0,0,0,12"
+                                            ColumnSpacing="8"
+                                            Visibility="Collapsed">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox
+                                                x:Name="CustomDirBox"
+                                                Header="自定义目录"
+                                                PlaceholderText="C:\Movies\translated" />
+                                            <Button
+                                                Grid.Column="1"
+                                                VerticalAlignment="Bottom"
+                                                Click="OnChooseCustomDir"
+                                                Content="选择…" />
+                                        </Grid>
+
+                                        <ToggleSwitch
+                                            x:Name="ForceSwitch"
+                                            Header="强制重新处理"
+                                            OffContent="跳过已有输出"
+                                            OnContent="覆盖已有输出" />
+
+                                        <Button
+                                            Margin="0,8,0,0"
+                                            Click="OnOpenOutput"
+                                            HorizontalAlignment="Stretch">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <FontIcon Glyph="&#xE838;" FontSize="14" />
+                                                <TextBlock Text="打开输出目录" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource CardStyle}">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="并发与重试" />
+                                        <NumberBox
+                                            x:Name="WorkersBox"
+                                            Margin="0,0,0,12"
+                                            Header="并发数"
+                                            Maximum="64"
+                                            Minimum="1"
+                                            SpinButtonPlacementMode="Compact"
+                                            Value="20" />
+                                        <NumberBox
+                                            x:Name="RetriesBox"
+                                            Header="重试次数"
+                                            Maximum="5"
+                                            Minimum="0"
+                                            SpinButtonPlacementMode="Compact"
+                                            Value="2" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+
+                    <!-- 底部操作区 -->
+                    <Grid Grid.Row="2" ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="6">
+                            <ProgressBar x:Name="JobProgressBar" />
+                            <TextBlock
+                                x:Name="StatusLabel"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Text="拖入 .srt 文件或文件夹开始" />
+                        </StackPanel>
+                        <Button
+                            x:Name="StartButton"
+                            Grid.Column="1"
+                            MinWidth="132"
+                            Click="OnStart"
+                            Style="{StaticResource AccentButtonStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon x:Name="StartIcon" FontSize="14" Glyph="&#xE768;" />
+                                <TextBlock x:Name="StartButtonText" Text="开始翻译" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </Grid>
+
+                <!-- ===================================================== 提供商 -->
+                <Grid
+                    x:Name="ProvidersPanel"
+                    Padding="24,8,24,20"
+                    RowSpacing="16"
+                    Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Spacing="2">
+                        <TextBlock Text="提供商" Style="{StaticResource TitleTextBlockStyle}" />
+                        <TextBlock
+                            Text="OpenAI 兼容接口与本地 Ollama；API Key 用 DPAPI 加密，不写进 JSON"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+
+                    <StackPanel
+                        Grid.Row="1"
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <Button
+                            Click="OnProviderAdd"
+                            Content="添加"
+                            Style="{StaticResource AccentButtonStyle}" />
+                        <Button Click="OnProviderEdit" Content="编辑" />
+                        <Button Click="OnProviderSetActive" Content="设为当前" />
+                        <Button Click="OnProviderTest" Content="测试连接" />
+                        <Button Click="OnProviderDelete" Content="删除" />
+                        <Button Click="OnProviderImport" Content="从旧版导入…" />
+                    </StackPanel>
+
+                    <Border
+                        Grid.Row="2"
+                        Padding="4"
+                        Style="{StaticResource CardStyle}">
+                        <Grid>
+                            <ListView
+                                x:Name="ProviderList"
+                                SelectionMode="Single">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="local:ProviderItem">
+                                        <Grid Padding="8,10" ColumnSpacing="14">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border
+                                                Width="36"
+                                                Height="36"
+                                                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                                CornerRadius="8"
+                                                VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xE774;" FontSize="16" />
+                                            </Border>
+                                            <StackPanel
+                                                Grid.Column="1"
+                                                Spacing="2"
+                                                VerticalAlignment="Center">
+                                                <TextBlock
+                                                    Style="{StaticResource BodyStrongTextBlockStyle}"
+                                                    Text="{x:Bind Name}" />
+                                                <TextBlock
+                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                                    Text="{x:Bind BaseUrl}"
+                                                    TextTrimming="CharacterEllipsis" />
+                                                <TextBlock
+                                                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                                    Text="{x:Bind Model}" />
+                                            </StackPanel>
+                                            <Border
+                                                Grid.Column="2"
+                                                Padding="8,2"
+                                                Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                                CornerRadius="10"
+                                                VerticalAlignment="Center"
+                                                Visibility="{x:Bind BadgeVisibility}">
+                                                <TextBlock
+                                                    Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                                    Text="{x:Bind Badge}" />
+                                            </Border>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+
+                            <StackPanel
+                                x:Name="ProviderEmptyState"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                IsHitTestVisible="False"
+                                Spacing="10">
+                                <FontIcon
+                                    Glyph="&#xE774;"
+                                    FontSize="36"
+                                    Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    Style="{StaticResource BodyStrongTextBlockStyle}"
+                                    Text="还没有配置提供商" />
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="点「添加」从预设开始，或从旧版配置导入" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- ===================================================== 关于 -->
+                <Grid
+                    x:Name="AboutPanel"
+                    Padding="24,8,24,20"
+                    RowSpacing="16"
+                    Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Spacing="2">
+                        <TextBlock Text="关于" Style="{StaticResource TitleTextBlockStyle}" />
+                        <TextBlock
+                            Text="AITrans 把 SRT 字幕批量翻译成中文 / 英文 / 日文 / 韩文"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <StackPanel MaxWidth="720" Spacing="12">
+                            <Border Style="{StaticResource CardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border
+                                        Width="48"
+                                        Height="48"
+                                        Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                        CornerRadius="12">
+                                        <FontIcon
+                                            Glyph="&#xE8C1;"
+                                            FontSize="24"
+                                            Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="AITrans" />
+                                        <TextBlock
+                                            x:Name="VersionText"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Style="{StaticResource CaptionTextBlockStyle}" />
+                                        <TextBlock
+                                            Text="Windows 客户端 · WinUI 3"
+                                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                            Style="{StaticResource CaptionTextBlockStyle}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <Border Style="{StaticResource CardStyle}">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="维护" />
+                                    <Button
+                                        Click="OnCheckUpdates"
+                                        HorizontalAlignment="Stretch">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon Glyph="&#xE895;" FontSize="14" />
+                                            <TextBlock Text="检查更新…" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button
+                                        Click="OnOpenDataFolder"
+                                        HorizontalAlignment="Stretch">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon Glyph="&#xE8B7;" FontSize="14" />
+                                            <TextBlock Text="打开应用数据目录" />
+                                        </StackPanel>
+                                    </Button>
+                                    <TextBlock
+                                        Text="未签名版本，首次打开可能被 SmartScreen 拦截：点「更多信息」→「仍要运行」。"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Style="{StaticResource CaptionTextBlockStyle}"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
             </Grid>
-
-            <!-- 设置面板 -->
-            <ScrollViewer
-                Grid.Column="1"
-                Width="340"
-                Padding="16,0,16,0"
-                VerticalScrollBarVisibility="Auto">
-                <StackPanel Spacing="14">
-                    <TextBlock Text="翻译" Style="{StaticResource SubtitleTextBlockStyle}" />
-
-                    <ComboBox x:Name="EngineCombo" Header="引擎" MinWidth="280" SelectionChanged="OnEngineChanged" />
-                    <TextBox x:Name="ModelBox" Header="模型" PlaceholderText="deepseek-flash" />
-                    <ComboBox x:Name="LanguageCombo" Header="目标语言" MinWidth="280" />
-
-                    <ToggleSwitch x:Name="PolishSwitch" Header="润色" OnContent="开启" OffContent="关闭" IsOn="True" />
-                    <ToggleSwitch x:Name="ForceSwitch" Header="强制重新处理" OnContent="开启" OffContent="关闭" />
-
-                    <TextBlock Text="输出" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,8,0,0" />
-                    <ComboBox x:Name="OutputCombo" Header="位置" MinWidth="280" SelectionChanged="OnOutputModeChanged" />
-                    <TextBox x:Name="SuffixBox" Header="文件名后缀" Text="_translated" />
-                    <StackPanel x:Name="CustomDirPanel" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
-                        <TextBox x:Name="CustomDirBox" Header="自定义目录" Width="220" />
-                        <Button Content="选择…" Click="OnChooseCustomDir" VerticalAlignment="Bottom" />
-                    </StackPanel>
-
-                    <TextBlock Text="并发与重试" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,8,0,0" />
-                    <NumberBox x:Name="WorkersBox" Header="并发数" Minimum="1" Maximum="64" Value="20" SpinButtonPlacementMode="Compact" />
-                    <NumberBox x:Name="RetriesBox" Header="重试次数" Minimum="0" Maximum="5" Value="2" SpinButtonPlacementMode="Compact" />
-
-                    <TextBlock Text="关于" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,8,0,0" />
-                    <TextBlock x:Name="VersionText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="检查更新…" Click="OnCheckUpdates" />
-                        <Button Content="打开输出目录" Click="OnOpenOutput" />
-                    </StackPanel>
-                </StackPanel>
-            </ScrollViewer>
-        </Grid>
-
-        <!-- 状态栏 -->
-        <Grid Grid.Row="3" Padding="16,10" RowSpacing="6">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-            <ProgressBar x:Name="JobProgressBar" Grid.Row="0" />
-            <TextBlock
-                x:Name="StatusText"
-                Grid.Row="1"
-                Text="拖入 .srt 文件或文件夹开始"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-        </Grid>
+        </NavigationView>
     </Grid>
 </Window>

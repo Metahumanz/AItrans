@@ -1,10 +1,13 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using AITrans.Core;
-using Microsoft.UI;
+using Microsoft.UI.Composition.SystemBackdrops;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Graphics;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 using Windows.System;
@@ -16,8 +19,8 @@ public sealed partial class MainWindow : Window
 {
     private readonly SettingsStore _settingsStore = new();
     private readonly ProviderStore _providerStore;
-    private readonly List<string> _files = [];
-    private readonly Dictionary<string, FileResult> _results = new();
+    private readonly ObservableCollection<FileItem> _files = [];
+    private readonly ObservableCollection<ProviderItem> _providers = [];
 
     private CancellationTokenSource? _cts;
     private bool _running;
@@ -28,6 +31,8 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
 
         _providerStore = new ProviderStore(new DpapiSecretStore(AppPaths.SecretsFile));
+
+        ConfigureWindow();
 
         try
         {
@@ -56,7 +61,9 @@ public sealed partial class MainWindow : Window
             // 配置损坏时从空列表开始。
         }
 
-        BuildCombos();
+        FileList.ItemsSource = _files;
+        ProviderList.ItemsSource = _providers;
+
         ApplySettingsToUi();
         RefreshProviders();
         RefreshFiles();
@@ -68,23 +75,36 @@ public sealed partial class MainWindow : Window
 
     // ---------------------------------------------------------------- 初始化
 
+    private void ConfigureWindow()
+    {
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+
+        if (MicaController.IsSupported())
+        {
+            SystemBackdrop = new MicaBackdrop();
+            Nav.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+        }
+        else
+        {
+            Root.Background = (Brush)Application.Current.Resources["ApplicationPageBackgroundThemeBrush"];
+        }
+
+        // AppWindow.Resize 用的是物理像素，按当前 DPI 换算成逻辑尺寸，再夹到工作区内。
+        var scale = GetDpiForWindow(WindowNative.GetWindowHandle(this)) / 96.0;
+        var workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+        var width = Math.Min((int)(1180 * scale), workArea.Width - 80);
+        var height = Math.Min((int)(800 * scale), workArea.Height - 80);
+        AppWindow.Resize(new SizeInt32(width, height));
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
+
     private static string GetVersion()
     {
         var version = typeof(MainWindow).Assembly.GetName().Version;
         return version is null ? "0.0.0" : $"{version.Major}.{version.Minor}.{version.Build}";
-    }
-
-    private void BuildCombos()
-    {
-        EngineCombo.Items.Add("API 提供商");
-        EngineCombo.Items.Add("本地 Ollama");
-        LanguageCombo.Items.Add("中文");
-        LanguageCombo.Items.Add("英文");
-        LanguageCombo.Items.Add("日文");
-        LanguageCombo.Items.Add("韩文");
-        OutputCombo.Items.Add("源文件目录");
-        OutputCombo.Items.Add("应用输出目录");
-        OutputCombo.Items.Add("自定义目录");
     }
 
     private void ApplySettingsToUi()
@@ -93,6 +113,7 @@ public sealed partial class MainWindow : Window
         EngineCombo.SelectedIndex = settings.Backend == Engine.api ? 0 : 1;
         ModelBox.Text = settings.ApiModel;
         LanguageCombo.SelectedIndex = (int)settings.Lang;
+        TranslateSwitch.IsOn = settings.Translate;
         PolishSwitch.IsOn = settings.Polish;
         ForceSwitch.IsOn = settings.Force;
         OutputCombo.SelectedIndex = settings.OutputMode switch
@@ -103,8 +124,8 @@ public sealed partial class MainWindow : Window
         };
         SuffixBox.Text = settings.Suffix;
         CustomDirBox.Text = settings.CustomDir;
-        WorkersBox.Value = settings.ApiWorkers;
-        RetriesBox.Value = settings.ApiRetries;
+        WorkersBox.Value = settings.Backend == Engine.ollama ? settings.OllamaWorkers : settings.ApiWorkers;
+        RetriesBox.Value = settings.Backend == Engine.ollama ? settings.OllamaRetries : settings.ApiRetries;
         CustomDirPanel.Visibility = settings.OutputMode == OutputMode.custom ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -114,6 +135,7 @@ public sealed partial class MainWindow : Window
         settings.Backend = EngineCombo.SelectedIndex == 1 ? Engine.ollama : Engine.api;
         settings.ApiModel = ModelBox.Text.Trim();
         settings.Lang = (Language)Math.Max(0, LanguageCombo.SelectedIndex);
+        settings.Translate = TranslateSwitch.IsOn;
         settings.Polish = PolishSwitch.IsOn;
         settings.Force = ForceSwitch.IsOn;
         settings.OutputMode = OutputCombo.SelectedIndex switch
@@ -124,8 +146,18 @@ public sealed partial class MainWindow : Window
         };
         settings.Suffix = SuffixBox.Text;
         settings.CustomDir = CustomDirBox.Text;
-        settings.ApiWorkers = double.IsNaN(WorkersBox.Value) ? 20 : (int)WorkersBox.Value;
-        settings.ApiRetries = double.IsNaN(RetriesBox.Value) ? 2 : (int)RetriesBox.Value;
+        var workers = double.IsNaN(WorkersBox.Value) ? 20 : (int)WorkersBox.Value;
+        var retries = double.IsNaN(RetriesBox.Value) ? 2 : (int)RetriesBox.Value;
+        if (settings.Backend == Engine.ollama)
+        {
+            settings.OllamaWorkers = workers;
+            settings.OllamaRetries = retries;
+        }
+        else
+        {
+            settings.ApiWorkers = workers;
+            settings.ApiRetries = retries;
+        }
 
         try
         {
@@ -137,15 +169,12 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void RefreshProviders()
+    private void OnNavSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        ProviderCombo.Items.Clear();
-        foreach (var provider in _providerStore.Providers)
-        {
-            ProviderCombo.Items.Add(provider.Name);
-        }
-        var activeIndex = _providerStore.Providers.FindIndex(p => p.Id == _providerStore.ActiveId);
-        ProviderCombo.SelectedIndex = activeIndex >= 0 ? activeIndex : (_providerStore.Providers.Count > 0 ? 0 : -1);
+        var tag = (args.SelectedItemContainer as NavigationViewItem)?.Tag as string;
+        TasksPanel.Visibility = tag == "tasks" ? Visibility.Visible : Visibility.Collapsed;
+        ProvidersPanel.Visibility = tag == "providers" ? Visibility.Visible : Visibility.Collapsed;
+        AboutPanel.Visibility = tag == "about" ? Visibility.Visible : Visibility.Collapsed;
     }
 
     // ---------------------------------------------------------------- 文件
@@ -154,8 +183,8 @@ public sealed partial class MainWindow : Window
     {
         if (!string.Equals(Path.GetExtension(path), ".srt", StringComparison.OrdinalIgnoreCase)) return;
         var full = Path.GetFullPath(path);
-        if (_files.Any(existing => string.Equals(existing, full, StringComparison.OrdinalIgnoreCase))) return;
-        _files.Add(full);
+        if (_files.Any(existing => string.Equals(existing.Path, full, StringComparison.OrdinalIgnoreCase))) return;
+        _files.Add(new FileItem(full));
     }
 
     private void AddFolder(string path)
@@ -169,75 +198,12 @@ public sealed partial class MainWindow : Window
 
     private void RefreshFiles()
     {
-        FileList.Items.Clear();
         EmptyState.Visibility = _files.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-
-        foreach (var path in _files)
-        {
-            var name = Path.GetFileName(path);
-            _results.TryGetValue(name, out var result);
-
-            var row = new Grid { Padding = new Thickness(4, 6, 4, 6) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-            var icon = new FontIcon
-            {
-                Glyph = GlyphFor(result),
-                FontSize = 16,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 10, 0),
-            };
-            Grid.SetColumn(icon, 0);
-
-            var texts = new StackPanel { Spacing = 2 };
-            texts.Children.Add(new TextBlock { Text = name, TextTrimming = TextTrimming.CharacterEllipsis });
-            texts.Children.Add(new TextBlock
-            {
-                Text = SubtitleFor(path, result),
-                FontSize = 12,
-                Foreground = ThemeBrush("TextFillColorSecondaryBrush"),
-                TextTrimming = TextTrimming.CharacterEllipsis,
-            });
-            Grid.SetColumn(texts, 1);
-
-            row.Children.Add(icon);
-            row.Children.Add(texts);
-            FileList.Items.Add(row);
-        }
-
-        if (_files.Count > 0)
-        {
-            StatusText.Text = $"已添加 {_files.Count} 个文件";
-        }
+        if (_running) return;
+        StatusLabel.Text = _files.Count == 0
+            ? "拖入 .srt 文件或文件夹开始"
+            : $"已添加 {_files.Count} 个文件";
     }
-
-    private static string GlyphFor(FileResult? result) => result?.Status switch
-    {
-        FileResult.StatusKind.success => "\uE73E",
-        FileResult.StatusKind.skipped => "\uE8AB",
-        FileResult.StatusKind.failed => "\uE7BA",
-        _ => "\uE8A5",
-    };
-
-    private static string SubtitleFor(string path, FileResult? result)
-    {
-        if (result is null) return Path.GetDirectoryName(path) ?? "";
-        return result.Status switch
-        {
-            FileResult.StatusKind.success =>
-                $"成功 {result.TranslatedCount} 段{(result.ErrorCount > 0 ? $"，失败 {result.ErrorCount} 段" : "")}",
-            FileResult.StatusKind.skipped => "已存在，跳过",
-            _ => result.Error ?? "失败",
-        };
-    }
-
-    private static Brush ThemeBrush(string key) =>
-        Application.Current.Resources.TryGetValue(key, out var value) && value is Brush brush
-            ? brush
-            : new SolidColorBrush(Colors.Gray);
-
-    // ---------------------------------------------------------------- 交互
 
     private async void OnAddFiles(object sender, RoutedEventArgs e)
     {
@@ -263,14 +229,18 @@ public sealed partial class MainWindow : Window
         RefreshFiles();
     }
 
-    private void OnAddPath(object sender, RoutedEventArgs e)
+    private void OnClearFiles(object sender, RoutedEventArgs e)
     {
-        AddPathFromBox();
+        if (_running) return;
+        _files.Clear();
+        RefreshFiles();
     }
+
+    private void OnAddPath(object sender, RoutedEventArgs e) => AddPathFromBox();
 
     private void OnPathKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
     {
-        if (e.Key != Windows.System.VirtualKey.Enter) return;
+        if (e.Key != VirtualKey.Enter) return;
         AddPathFromBox();
         e.Handled = true;
     }
@@ -327,6 +297,9 @@ public sealed partial class MainWindow : Window
     private void OnEngineChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_initializing) return;
+        var ollama = EngineCombo.SelectedIndex == 1;
+        WorkersBox.Value = ollama ? _settingsStore.Settings.OllamaWorkers : _settingsStore.Settings.ApiWorkers;
+        RetriesBox.Value = ollama ? _settingsStore.Settings.OllamaRetries : _settingsStore.Settings.ApiRetries;
     }
 
     private void OnOutputModeChanged(object sender, SelectionChangedEventArgs e)
@@ -342,22 +315,6 @@ public sealed partial class MainWindow : Window
         picker.FileTypeFilter.Add("*");
         var folder = await picker.PickSingleFolderAsync();
         if (folder is not null) CustomDirBox.Text = folder.Path;
-    }
-
-    private void OnProviderChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_initializing) return;
-        var index = ProviderCombo.SelectedIndex;
-        if (index < 0 || index >= _providerStore.Providers.Count) return;
-        try
-        {
-            _providerStore.SetActive(_providerStore.Providers[index].Id);
-            _providerStore.Save(AppPaths.ProvidersFile);
-        }
-        catch (Exception error)
-        {
-            _ = ShowMessageAsync(error.Message);
-        }
     }
 
     // ---------------------------------------------------------------- 任务
@@ -383,7 +340,7 @@ public sealed partial class MainWindow : Window
         var provider = _providerStore.ActiveProvider;
         if (!usesOllama && provider is null)
         {
-            await ShowMessageAsync("请先在「管理提供商」里添加并启用一个提供商。");
+            await ShowMessageAsync("请先在「提供商」里添加并启用一个提供商。");
             return;
         }
 
@@ -395,6 +352,7 @@ public sealed partial class MainWindow : Window
             await ShowMessageAsync(usesOllama ? "请填写 Ollama 模型名称。" : "请填写模型名称。");
             return;
         }
+
         var customDirectory = settings.OutputMode == OutputMode.custom && !string.IsNullOrWhiteSpace(settings.CustomDir)
             ? settings.CustomDir
             : null;
@@ -410,61 +368,68 @@ public sealed partial class MainWindow : Window
 
         _cts = new CancellationTokenSource();
         _running = true;
-        _results.Clear();
-        RefreshFiles();
+        foreach (var item in _files) item.Result = null;
         StartButtonText.Text = "取消";
+        StartIcon.Glyph = "\uE711";
         JobProgressBar.IsIndeterminate = false;
         JobProgressBar.Value = 0;
-        StatusText.Text = "准备开始…";
+        StatusLabel.Text = "准备开始…";
 
         var progress = new Progress<JobProgress>(update =>
         {
             JobProgressBar.Value = update.Total == 0 ? 0 : update.Completed * 100.0 / update.Total;
-            StatusText.Text = string.IsNullOrEmpty(update.CurrentName)
-                ? "完成"
-                : $"正在处理 {update.CurrentName}";
+            StatusLabel.Text = string.IsNullOrEmpty(update.CurrentName)
+                ? $"已完成 {update.Completed}/{update.Total}"
+                : $"正在处理 {update.CurrentName}（{update.Completed}/{update.Total}）";
         });
 
         try
         {
             if (usesOllama)
             {
-                StatusText.Text = "正在检查本地 Ollama…";
+                JobProgressBar.IsIndeterminate = true;
+                StatusLabel.Text = "正在检查本地 Ollama…";
                 await OllamaService.EnsureRunningAsync();
                 await OllamaService.EnsureModelAsync(settings.OllamaModel);
+                JobProgressBar.IsIndeterminate = false;
             }
 
             var results = await runner.RunAsync(
-                _files,
+                _files.Select(item => item.Path).ToList(),
                 settings,
                 AppPaths.DefaultOutputDirectory,
                 customDirectory,
                 progress,
                 cancellationToken: _cts.Token);
 
-            foreach (var result in results) _results[result.Name] = result;
-            RefreshFiles();
+            foreach (var result in results)
+            {
+                var item = _files.FirstOrDefault(file =>
+                    string.Equals(Path.GetFileName(file.Path), result.Name, StringComparison.OrdinalIgnoreCase));
+                if (item is not null) item.Result = result;
+            }
 
             var ok = results.Count(result => result.Status == FileResult.StatusKind.success);
             var skipped = results.Count(result => result.Status == FileResult.StatusKind.skipped);
             var failed = results.Count(result => result.Status == FileResult.StatusKind.failed);
             JobProgressBar.Value = 100;
-            StatusText.Text = $"完成：成功 {ok}，跳过 {skipped}，失败 {failed}";
+            StatusLabel.Text = $"完成：成功 {ok}，跳过 {skipped}，失败 {failed}";
             if (failed > 0) await ShowMessageAsync($"有 {failed} 个文件失败，详情见列表。");
         }
         catch (OperationCanceledException)
         {
-            StatusText.Text = "已取消";
+            StatusLabel.Text = "已取消";
         }
         catch (Exception error)
         {
-            StatusText.Text = "已停止";
+            StatusLabel.Text = "已停止";
             await ShowMessageAsync(error.Message);
         }
         finally
         {
             _running = false;
-            StartButtonText.Text = "开始";
+            StartButtonText.Text = "开始翻译";
+            StartIcon.Glyph = "\uE768";
             JobProgressBar.IsIndeterminate = false;
             _cts?.Dispose();
             _cts = null;
@@ -473,60 +438,136 @@ public sealed partial class MainWindow : Window
 
     // ---------------------------------------------------------------- 提供商
 
-    private async void OnManageProviders(object sender, RoutedEventArgs e)
+    private void RefreshProviders()
     {
-        var combo = new ComboBox { MinWidth = 320, Header = "提供商" };
-        foreach (var provider in _providerStore.Providers) combo.Items.Add(provider.Name);
+        _providers.Clear();
+        foreach (var provider in _providerStore.Providers)
+        {
+            _providers.Add(new ProviderItem(provider, provider.Id == _providerStore.ActiveId));
+        }
+        ProviderEmptyState.Visibility = _providers.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
 
-        var nameBox = new TextBox { Header = "名称", MinWidth = 320 };
-        var urlBox = new TextBox { Header = "接口地址", MinWidth = 320 };
-        var modelBox = new TextBox { Header = "模型", MinWidth = 320 };
-        var keyBox = new PasswordBox { Header = "API Key", MinWidth = 320 };
+    private ProviderItem? SelectedProvider =>
+        ProviderList.SelectedItem as ProviderItem;
+
+    private async void OnProviderAdd(object sender, RoutedEventArgs e) => await ShowProviderDialogAsync(null);
+
+    private async void OnProviderEdit(object sender, RoutedEventArgs e)
+    {
+        if (SelectedProvider is null)
+        {
+            await ShowMessageAsync("请先在列表里选择一个提供商。");
+            return;
+        }
+        await ShowProviderDialogAsync(SelectedProvider);
+    }
+
+    private async void OnProviderSetActive(object sender, RoutedEventArgs e)
+    {
+        if (SelectedProvider is null)
+        {
+            await ShowMessageAsync("请先在列表里选择一个提供商。");
+            return;
+        }
+        try
+        {
+            _providerStore.SetActive(SelectedProvider.Provider.Id);
+            _providerStore.Save(AppPaths.ProvidersFile);
+            RefreshProviders();
+        }
+        catch (Exception error)
+        {
+            await ShowMessageAsync(error.Message);
+        }
+    }
+
+    private async void OnProviderTest(object sender, RoutedEventArgs e)
+    {
+        if (SelectedProvider is null)
+        {
+            await ShowMessageAsync("请先在列表里选择一个提供商。");
+            return;
+        }
+        StatusLabel.Text = "正在测试连接…";
+        var message = await TestProviderAsync(SelectedProvider.Provider.BaseUrl, SelectedProvider.Provider.ApiKey);
+        StatusLabel.Text = message;
+        await ShowMessageAsync(message);
+    }
+
+    private async void OnProviderDelete(object sender, RoutedEventArgs e)
+    {
+        if (SelectedProvider is null)
+        {
+            await ShowMessageAsync("请先在列表里选择一个提供商。");
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = Root.XamlRoot,
+            Title = "删除提供商",
+            Content = new TextBlock
+            {
+                Text = $"确定删除「{SelectedProvider.Provider.Name}」？密钥会一并移除。",
+                TextWrapping = TextWrapping.Wrap,
+            },
+            PrimaryButtonText = "删除",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+        _providerStore.Delete(SelectedProvider.Provider.Id);
+        _providerStore.Save(AppPaths.ProvidersFile);
+        RefreshProviders();
+    }
+
+    private async void OnProviderImport(object sender, RoutedEventArgs e)
+    {
+        var picker = new FileOpenPicker();
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+        picker.FileTypeFilter.Add(".json");
+        picker.FileTypeFilter.Add(".env");
+        var file = await picker.PickSingleFileAsync();
+        if (file is null) return;
+
+        try
+        {
+            var count = _providerStore.ImportLegacy(file.Path, null);
+            _providerStore.Save(AppPaths.ProvidersFile);
+            RefreshProviders();
+            await ShowMessageAsync(count > 0 ? $"已导入 {count} 个提供商。" : "没有找到可导入的配置。");
+        }
+        catch (Exception error)
+        {
+            await ShowMessageAsync(error.Message);
+        }
+    }
+
+    private async Task ShowProviderDialogAsync(ProviderItem? existing)
+    {
+        var editing = existing?.Provider.Clone();
+
+        var presetCombo = new ComboBox
+        {
+            Header = "从预设开始",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Margin = new Thickness(0, 0, 0, 12),
+            Visibility = existing is null ? Visibility.Visible : Visibility.Collapsed,
+        };
+        foreach (var preset in Spec.Presets) presetCombo.Items.Add(preset.Name);
+
+        var nameBox = new TextBox { Header = "名称", Margin = new Thickness(0, 0, 0, 12), Text = editing?.Name ?? "" };
+        var urlBox = new TextBox { Header = "接口地址", Margin = new Thickness(0, 0, 0, 12), Text = editing?.BaseUrl ?? "" };
+        var modelBox = new TextBox { Header = "模型", Margin = new Thickness(0, 0, 0, 12), Text = editing?.Model ?? "" };
+        var keyBox = new PasswordBox { Header = "API Key", Margin = new Thickness(0, 0, 0, 12), Password = editing?.ApiKey ?? "" };
         var testText = new TextBlock
         {
             TextWrapping = TextWrapping.Wrap,
-            Foreground = ThemeBrush("TextFillColorSecondaryBrush"),
+            Foreground = UiBrush.Get("TextFillColorSecondaryBrush", Microsoft.UI.Colors.Gray),
+            Margin = new Thickness(0, 8, 0, 0),
         };
-
-        var presetCombo = new ComboBox { MinWidth = 200, Header = "从预设新建" };
-        foreach (var preset in Spec.Presets) presetCombo.Items.Add(preset.Name);
-
-        string? editingId = _providerStore.ActiveId ?? _providerStore.Providers.FirstOrDefault()?.Id;
-
-        void LoadProvider(string? id)
-        {
-            editingId = id;
-            var provider = id is null ? null : _providerStore.Find(id);
-            combo.SelectedIndex = provider is null ? -1 : _providerStore.Providers.FindIndex(p => p.Id == provider.Id);
-            nameBox.Text = provider?.Name ?? "";
-            urlBox.Text = provider?.BaseUrl ?? "";
-            modelBox.Text = provider?.Model ?? "";
-            keyBox.Password = provider?.ApiKey ?? "";
-            testText.Text = "";
-        }
-
-        combo.SelectionChanged += (_, _) =>
-        {
-            if (combo.SelectedIndex >= 0 && combo.SelectedIndex < _providerStore.Providers.Count)
-            {
-                LoadProvider(_providerStore.Providers[combo.SelectedIndex].Id);
-            }
-        };
-
-        presetCombo.SelectionChanged += (_, _) =>
-        {
-            if (presetCombo.SelectedIndex < 0 || presetCombo.SelectedIndex >= Spec.Presets.Length) return;
-            var preset = Spec.Presets[presetCombo.SelectedIndex];
-            editingId = null;
-            combo.SelectedIndex = -1;
-            nameBox.Text = preset.Name;
-            urlBox.Text = preset.BaseUrl;
-            modelBox.Text = preset.Model;
-            keyBox.Password = "";
-        };
-
-        var newButton = new Button { Content = "新建" };
-        newButton.Click += (_, _) => LoadProvider(null);
 
         var testButton = new Button { Content = "测试连接" };
         testButton.Click += async (_, _) =>
@@ -535,85 +576,53 @@ public sealed partial class MainWindow : Window
             testText.Text = await TestProviderAsync(urlBox.Text.Trim(), keyBox.Password);
         };
 
-        var importButton = new Button { Content = "从旧版导入…" };
-        importButton.Click += async (_, _) =>
+        presetCombo.SelectionChanged += (_, _) =>
         {
-            var picker = new FileOpenPicker();
-            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
-            picker.FileTypeFilter.Add(".json");
-            var file = await picker.PickSingleFileAsync();
-            if (file is null) return;
-            try
-            {
-                var count = _providerStore.ImportLegacy(file.Path, null);
-                _providerStore.Save(AppPaths.ProvidersFile);
-                combo.Items.Clear();
-                foreach (var provider in _providerStore.Providers) combo.Items.Add(provider.Name);
-                RefreshProviders();
-                testText.Text = count > 0 ? $"已导入 {count} 个提供商。" : "没有找到可导入的配置。";
-            }
-            catch (Exception error)
-            {
-                testText.Text = error.Message;
-            }
+            if (presetCombo.SelectedIndex < 0 || presetCombo.SelectedIndex >= Spec.Presets.Length) return;
+            var preset = Spec.Presets[presetCombo.SelectedIndex];
+            nameBox.Text = preset.Name;
+            urlBox.Text = preset.BaseUrl;
+            modelBox.Text = preset.Model;
         };
 
-        var content = new StackPanel { Spacing = 10, MinWidth = 380 };
-        content.Children.Add(combo);
-        content.Children.Add(newButton);
+        var content = new StackPanel { MinWidth = 420, Spacing = 0 };
         content.Children.Add(presetCombo);
         content.Children.Add(nameBox);
         content.Children.Add(urlBox);
         content.Children.Add(modelBox);
         content.Children.Add(keyBox);
-        content.Children.Add(new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 8,
-            Children = { testButton, importButton },
-        });
+        content.Children.Add(testButton);
         content.Children.Add(testText);
 
         var dialog = new ContentDialog
         {
-            XamlRoot = Content.XamlRoot,
-            Title = "提供商",
+            XamlRoot = Root.XamlRoot,
+            Title = existing is null ? "添加提供商" : "编辑提供商",
             Content = content,
             PrimaryButtonText = "保存",
-            SecondaryButtonText = "删除",
-            CloseButtonText = "关闭",
+            CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Primary,
         };
 
-        LoadProvider(editingId);
-        var result = await dialog.ShowAsync();
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
 
-        if (result == ContentDialogResult.Primary)
+        try
         {
-            try
+            _providerStore.Upsert(new Provider
             {
-                _providerStore.Upsert(new Provider
-                {
-                    Id = editingId ?? "",
-                    Name = nameBox.Text,
-                    BaseUrl = urlBox.Text,
-                    Model = modelBox.Text,
-                    ApiKey = keyBox.Password,
-                    RequiresKey = true,
-                }, activate: true);
-                _providerStore.Save(AppPaths.ProvidersFile);
-                RefreshProviders();
-            }
-            catch (Exception error)
-            {
-                await ShowMessageAsync(error.Message);
-            }
-        }
-        else if (result == ContentDialogResult.Secondary && editingId is not null)
-        {
-            _providerStore.Delete(editingId);
+                Id = editing?.Id ?? "",
+                Name = nameBox.Text,
+                BaseUrl = urlBox.Text,
+                Model = modelBox.Text,
+                ApiKey = keyBox.Password,
+                RequiresKey = true,
+            }, activate: true);
             _providerStore.Save(AppPaths.ProvidersFile);
             RefreshProviders();
+        }
+        catch (Exception error)
+        {
+            await ShowMessageAsync(error.Message);
         }
     }
 
@@ -661,7 +670,7 @@ public sealed partial class MainWindow : Window
 
             var dialog = new ContentDialog
             {
-                XamlRoot = Content.XamlRoot,
+                XamlRoot = Root.XamlRoot,
                 Title = $"发现新版本 {info.Version}",
                 Content = new ScrollViewer
                 {
@@ -683,9 +692,9 @@ public sealed partial class MainWindow : Window
             {
                 try
                 {
-                    StatusText.Text = "正在下载更新…";
+                    StatusLabel.Text = "正在下载更新…";
                     var path = await UpdateDownloader.DownloadAsync(info);
-                    StatusText.Text = "更新已下载";
+                    StatusLabel.Text = "更新已下载";
                     Process.Start(new ProcessStartInfo
                     {
                         FileName = "explorer.exe",
@@ -729,11 +738,30 @@ public sealed partial class MainWindow : Window
         await Task.CompletedTask;
     }
 
+    private async void OnOpenDataFolder(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            AppPaths.Prepare();
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = AppPaths.SupportDirectory,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception error)
+        {
+            await ShowMessageAsync(error.Message);
+        }
+        await Task.CompletedTask;
+    }
+
     private async Task ShowMessageAsync(string message)
     {
         var dialog = new ContentDialog
         {
-            XamlRoot = Content.XamlRoot,
+            XamlRoot = Root.XamlRoot,
             Title = "提示",
             Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
             CloseButtonText = "好",

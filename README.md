@@ -39,7 +39,13 @@ cd macos && swift test && ../macos/Scripts/package-app.sh 0.1.0
 # Windows
 dotnet test windows/AITrans.Core.Tests/AITrans.Core.Tests.csproj -c Release
 dotnet build windows/AITrans.App/AITrans.App.csproj -c Release -p:Platform=x64
+# 一条命令跑完上面两步（加 -Publish 还会校验发布产物）：
+powershell -ExecutionPolicy Bypass -File windows\scripts\verify.ps1 -Publish
 ```
+
+Windows 客户端是原生 WinUI 3（`NavigationView` + Mica + 自绘标题栏），发布产物**不打包运行时**
+（约 37 MB）：目标机器需要 .NET 10 桌面运行时与 Windows App Runtime 1.8，详见
+[docs/release.md](docs/release.md)。
 
 两个客户端都**不做代码签名**，首次打开需要手动放行：
 

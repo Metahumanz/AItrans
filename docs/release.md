@@ -27,7 +27,14 @@ git push origin v2.0.0
 | 平台 | 产物 | 说明 |
 | --- | --- | --- |
 | macOS | `AITrans-<version>-arm64.zip` | `.app` 压缩包（约 370 KB），解压后拖入「应用程序」 |
-| Windows | `AITrans-<version>-win-x64.zip` | 自包含目录（约 85 MB），解压后运行 `AITrans.exe` |
+| Windows | `AITrans-<version>-win-x64.zip` | 依赖运行时的目录（约 37 MB），解压后运行 `AITrans.exe` |
+
+Windows 包**不带** .NET 运行时和 Windows App SDK 运行时，使用前需要装好：
+
+- [.NET 10 桌面运行时](https://dotnet.microsoft.com/download/dotnet/10.0)（`Microsoft.WindowsDesktop.App 10.x`）；
+- [Windows App Runtime 1.8](https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads)。
+
+缺任一运行时时，`AITrans.exe` 会启动失败并提示缺少运行时，而不是闪退无提示。
 
 ## 3. 不签名的影响
 

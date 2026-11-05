@@ -67,14 +67,24 @@ Invoke-Step "构建 WinUI 客户端" {
 }
 
 if ($Publish) {
-    Invoke-Step "发布自包含包并校验产物" {
+    Invoke-Step "发布依赖运行时包并校验产物" {
         $dist = Join-Path $root "windows\dist\app"
         if (Test-Path $dist) { Remove-Item $dist -Recurse -Force }
-        dotnet publish $app -c Release -r win-x64 --self-contained true `
+        dotnet publish $app -c Release -r win-x64 --self-contained false `
             -p:Version=0.0.0-verify -o $dist
         $exe = Join-Path $dist "AITrans.exe"
         if (-not (Test-Path $exe)) { throw "缺少 $exe" }
+
+        # WinUI 的 XAML 资源不会被 dotnet publish 自动带上，缺了就启动即崩（0xC000027B）。
+        foreach ($required in @("AITrans.pri", "App.xbf", "MainWindow.xbf")) {
+            if (-not (Test-Path (Join-Path $dist $required))) {
+                throw "缺少 XAML 资源 $required"
+            }
+        }
+
         Write-Host "产物：$exe"
+        $bytes = (Get-ChildItem $dist -Recurse -File | Measure-Object -Property Length -Sum).Sum
+        Write-Host ("发布目录大小：{0:N1} MB（不含 .NET 与 Windows App SDK 运行时）" -f ($bytes / 1MB))
         Get-ChildItem $dist -Filter "*.dll" | Measure-Object | ForEach-Object {
             Write-Host "附带 DLL 数量：$($_.Count)"
         }

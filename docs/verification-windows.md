@@ -20,7 +20,7 @@ git checkout main
 powershell -ExecutionPolicy Bypass -File windows\scripts\verify.ps1
 ```
 
-加 `-Publish` 会额外执行一次自包含发布，并检查 `AITrans.exe` 是否生成：
+加 `-Publish` 会额外执行一次发布，并校验产物里 XAML 资源（`AITrans.pri`、`*.xbf`）是否齐全：
 
 ```bat
 powershell -ExecutionPolicy Bypass -File windows\scripts\verify.ps1 -Publish
@@ -31,7 +31,12 @@ powershell -ExecutionPolicy Bypass -File windows\scripts\verify.ps1 -Publish
 1. 检查 SDK 版本；
 2. `dotnet test`（全部单元测试）；
 3. `dotnet build`（WinUI 客户端能否编译）；
-4. 可选：`dotnet publish` 并校验产物。
+4. 可选：`dotnet publish --self-contained false` 并校验产物。
+
+> 发布产物**不打包 .NET 运行时和 Windows App SDK 运行时**（约 37 MB）。运行它的机器需要：
+> .NET 10 桌面运行时，以及 Windows App Runtime 1.8。缺任何一个都会启动失败。
+> `dotnet publish` 不会自动带上 WinUI 的 `AITrans.pri` 与 `*.xbf`，缺失时窗口创建即崩（`0xC000027B`），
+> 所以工程里有 `CopyWinUIXamlResourcesToPublish` 目标补拷，`verify.ps1 -Publish` 也会检查。
 
 ### 覆盖了哪些验收项
 
@@ -80,6 +85,7 @@ Passed!  - Failed:     0, Passed:    50+, Skipped:     0, Total:    50+
 
 ### 界面
 
+- [ ] 左侧导航在「翻译任务 / 提供商 / 关于」之间切换正常
 - [ ] 拖拽 `.srt` 文件到列表可用
 - [ ] 拖拽文件夹可用（收集其中的 SRT）
 - [ ] 「添加文件」「添加文件夹」打开系统对话框
@@ -87,6 +93,8 @@ Passed!  - Failed:     0, Passed:    50+, Skipped:     0, Total:    50+
 - [ ] 高 DPI（125% / 150%）下不模糊、不错位
 - [ ] 深色模式正常
 - [ ] 任务进行中「取消」能及时停止
+- [ ] 提供商页「添加」弹出编辑对话框；保存后出现在列表并标记「使用中」
+- [ ] 提供商页「测试连接」：正常 Key 返回 200，错误 Key 提示鉴权失败
 
 ### 真实服务
 
