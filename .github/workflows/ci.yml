@@ -101,3 +101,17 @@ jobs:
           done
           cd dist/app && 7z a -tzip "../AITrans-0.0.0-ci-win-x64.zip" . > /dev/null
           ls -l ../*.zip
+
+      - name: 构建安装包（验证 Inno 脚本）
+        if: steps.detect.outputs.app == 'true'
+        shell: bash
+        working-directory: windows
+        run: |
+          ISCC="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          if [ ! -f "$ISCC" ]; then
+            choco install innosetup --no-progress -y
+          fi
+          # Git Bash 会把 /DMyAppVersion=... 当路径改写，必须关掉路径转换。
+          MSYS2_ARG_CONV_EXCL='*' "$ISCC" "/DMyAppVersion=0.0.0-ci" installer/AITrans.iss
+          test -f "dist/AITrans-0.0.0-ci-win-x64-setup.exe" || { echo "安装包没生成"; exit 1; }
+          ls -l dist/*-setup.exe
