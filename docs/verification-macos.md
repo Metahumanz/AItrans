@@ -12,7 +12,7 @@
 ```sh
 cd macos
 swift test
-../macos/Scripts/package-app.sh 0.3.2
+../macos/Scripts/package-app.sh 0.3.3
 open dist/AITrans.app
 ```
 

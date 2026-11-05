@@ -8,7 +8,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MACOS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-VERSION="${1:-0.3.2}"
+VERSION="${1:-0.3.3}"
 DIST="$MACOS_DIR/dist"
 APP="$DIST/AITrans.app"
 
