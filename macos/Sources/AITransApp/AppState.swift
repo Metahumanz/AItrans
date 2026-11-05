@@ -17,6 +17,8 @@ final class AppState: ObservableObject {
     @Published var providers: [Provider] = []
     @Published var activeProviderID: String?
     @Published var updateInfo: UpdateInfo?
+    /// 启动时静默检查到的新版本，只显示顶部提示条，不弹窗。
+    @Published var backgroundUpdate: UpdateInfo?
     @Published var isCheckingUpdate = false
     @Published var isDownloadingUpdate = false
     @Published var downloadedUpdate: URL?
@@ -34,6 +36,7 @@ final class AppState: ObservableObject {
         self.providerStore = providerStore
         self.settings = settingsStore.settings
         reload()
+        checkForUpdatesQuietly()
     }
 
     var activeProvider: Provider? {
@@ -316,6 +319,23 @@ final class AppState: ObservableObject {
     }
 
     // MARK: - 更新
+
+    /// 启动后静默查一次。没网、被限流、已是最新都不打扰用户；
+    /// 只有确实有新版本时才在文件列顶部亮一条提示。
+    func checkForUpdatesQuietly() {
+        guard settings.autoCheckUpdates else { return }
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard let self, self.settings.autoCheckUpdates, self.updateInfo == nil else { return }
+            do {
+                if let info = try await UpdateChecker().check() {
+                    await MainActor.run { self.backgroundUpdate = info }
+                }
+            } catch {
+                // 后台检查失败保持静默。
+            }
+        }
+    }
 
     func checkForUpdates() {
         guard !isCheckingUpdate else { return }

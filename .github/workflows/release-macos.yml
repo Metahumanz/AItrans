@@ -43,7 +43,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: macos-dist
-          path: macos/dist/*.zip
+          path: |
+            macos/dist/*.zip
+            macos/dist/*.dmg
           if-no-files-found: error
 
       - name: 生成更新说明
@@ -64,13 +66,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
+          shopt -s nullglob
+          ASSETS=(macos/dist/*.zip macos/dist/*.dmg)
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "没有可上传的产物"
+            exit 1
+          fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release 已存在，补传 macOS 产物"
-            gh release upload "$TAG" macos/dist/*.zip --clobber
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
           else
             # 两个平台可能同时创建，失败则退回补传。
-            gh release create "$TAG" macos/dist/*.zip \
+            gh release create "$TAG" "${ASSETS[@]}" \
               --title "AItrans $TAG" --notes-file release-notes.md \
-              || gh release upload "$TAG" macos/dist/*.zip --clobber
+              || gh release upload "$TAG" "${ASSETS[@]}" --clobber
           fi
           gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.size)"'

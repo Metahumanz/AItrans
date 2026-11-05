@@ -20,6 +20,7 @@
     "api_workers": { "type": "integer", "minimum": 1, "maximum": 64 },
     "api_retries": { "type": "integer", "minimum": 0, "maximum": 5 },
     "ollama_workers": { "type": "integer", "minimum": 1, "maximum": 64 },
-    "ollama_retries": { "type": "integer", "minimum": 0, "maximum": 5 }
+    "ollama_retries": { "type": "integer", "minimum": 0, "maximum": 5 },
+    "auto_check_updates": { "type": "boolean" }
   }
 }

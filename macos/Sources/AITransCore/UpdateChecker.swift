@@ -11,10 +11,17 @@ public struct UpdateInfo: Sendable, Equatable {
 
 public struct UpdateChecker: Sendable {
     public let repository: String
+    /// 优先下载的资产后缀，按顺序匹配；都没有时回退到 .zip。
+    public let preferredExtensions: [String]
     private let session: URLSession
 
-    public init(repository: String = "Metahumanz/AItrans", session: URLSession = .shared) {
+    public init(
+        repository: String = "Metahumanz/AItrans",
+        preferredExtensions: [String] = [".dmg"],
+        session: URLSession = .shared
+    ) {
         self.repository = repository
+        self.preferredExtensions = preferredExtensions
         self.session = session
     }
 
@@ -43,9 +50,19 @@ public struct UpdateChecker: Sendable {
         let tag = (root["tag_name"] as? String ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
         let notes = root["body"] as? String ?? ""
         let assets = root["assets"] as? [[String: Any]] ?? []
-        let asset = assets.first { ($0["name"] as? String)?.hasSuffix(".zip") == true }
+        let named = assets.compactMap { asset -> (String, String)? in
+            guard
+                let name = asset["name"] as? String,
+                let url = asset["browser_download_url"] as? String
+            else { return nil }
+            return (name, url)
+        }
+        let preferred = preferredExtensions.lazy
+            .compactMap { ext in named.first { $0.0.lowercased().hasSuffix(ext.lowercased()) } }
+            .first
+        let asset = preferred ?? named.first { $0.0.lowercased().hasSuffix(".zip") }
         guard
-            let download = (asset?["browser_download_url"] as? String).flatMap(URL.init(string:)),
+            let download = asset.flatMap({ URL(string: $0.1) }),
             let page = (root["html_url"] as? String).flatMap(URL.init(string:))
         else {
             throw AITransError("该版本没有可下载的压缩包。")

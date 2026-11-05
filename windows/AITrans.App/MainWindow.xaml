@@ -107,10 +107,22 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <Grid
+                    <StackPanel
                         x:Name="TasksHeader"
                         Grid.Row="0"
-                        ColumnSpacing="8">
+                        Spacing="12">
+                        <InfoBar
+                            x:Name="UpdateBar"
+                            IsClosable="True"
+                            IsOpen="False"
+                            Severity="Informational"
+                            Title="发现新版本">
+                            <InfoBar.ActionButton>
+                                <Button Click="OnUpdateView" Content="查看更新" />
+                            </InfoBar.ActionButton>
+                        </InfoBar>
+
+                        <Grid ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -148,7 +160,8 @@
                             ToolTipService.ToolTip="清空列表">
                             <FontIcon Glyph="&#xE74D;" FontSize="14" />
                         </Button>
-                    </Grid>
+                        </Grid>
+                    </StackPanel>
 
                     <Grid Grid.Row="1" ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
@@ -618,6 +631,12 @@
                             <Border Style="{StaticResource CardStyle}">
                                 <StackPanel Spacing="10">
                                     <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="维护" />
+                                    <ToggleSwitch
+                                        x:Name="AutoCheckToggle"
+                                        Header="启动时自动检查更新"
+                                        OffContent="不自动检查"
+                                        OnContent="自动检查"
+                                        Toggled="OnAutoCheckToggled" />
                                     <Button
                                         Click="OnCheckUpdates"
                                         HorizontalAlignment="Stretch">

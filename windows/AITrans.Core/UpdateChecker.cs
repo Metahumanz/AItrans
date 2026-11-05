@@ -18,6 +18,12 @@ public sealed class UpdateChecker
 
     public string CurrentVersion { get; set; } = "0.0.0";
 
+    /// <summary>
+    /// 优先下载的资产后缀，按顺序匹配；都没有时回退到 .zip。
+    /// Windows 传 .exe（安装包），macOS 传 .dmg。
+    /// </summary>
+    public IReadOnlyList<string> PreferredExtensions { get; set; } = new[] { ".zip" };
+
     public async Task<UpdateInfo?> CheckAsync(CancellationToken cancellationToken = default)
     {
         using var request = new HttpRequestMessage(
@@ -49,15 +55,29 @@ public sealed class UpdateChecker
         string? download = null;
         if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
         {
+            var candidates = new List<(string Name, string Url)>();
             foreach (var asset in assets.EnumerateArray())
             {
                 var name = asset.TryGetProperty("name", out var nameElement) ? nameElement.GetString() ?? "" : "";
-                if (!name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) continue;
-                download = asset.TryGetProperty("browser_download_url", out var urlElement)
-                    ? urlElement.GetString()
-                    : null;
-                break;
+                var url = asset.TryGetProperty("browser_download_url", out var urlElement)
+                    ? urlElement.GetString() ?? ""
+                    : "";
+                if (!string.IsNullOrEmpty(url)) candidates.Add((name, url));
             }
+
+            foreach (var extension in PreferredExtensions)
+            {
+                var match = candidates.FirstOrDefault(c =>
+                    c.Name.EndsWith(extension, StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrEmpty(match.Name))
+                {
+                    download = match.Url;
+                    break;
+                }
+            }
+
+            download ??= candidates.FirstOrDefault(c =>
+                c.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)).Url;
         }
 
         if (string.IsNullOrEmpty(download) || string.IsNullOrEmpty(page))

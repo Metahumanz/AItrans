@@ -26,6 +26,7 @@ public sealed partial class MainWindow : Window
     private CancellationTokenSource? _cts;
     private bool _running;
     private bool _initializing = true;
+    private UpdateInfo? _updateInfo;
 
     public MainWindow()
     {
@@ -75,6 +76,7 @@ public sealed partial class MainWindow : Window
 
         // 等首帧排好版再放动画，否则窗口还没显示就已经播完了。
         DispatcherQueue.TryEnqueue(() => ShowPage("tasks", animate: true));
+        _ = CheckUpdatesQuietlyAsync();
     }
 
     // ---------------------------------------------------------------- 初始化
@@ -131,6 +133,7 @@ public sealed partial class MainWindow : Window
         WorkersBox.Value = settings.Backend == Engine.ollama ? settings.OllamaWorkers : settings.ApiWorkers;
         RetriesBox.Value = settings.Backend == Engine.ollama ? settings.OllamaRetries : settings.ApiRetries;
         CustomDirPanel.Visibility = settings.OutputMode == OutputMode.custom ? Visibility.Visible : Visibility.Collapsed;
+        AutoCheckToggle.IsOn = settings.AutoCheckUpdates;
     }
 
     private void SaveSettings()
@@ -150,6 +153,7 @@ public sealed partial class MainWindow : Window
         };
         settings.Suffix = SuffixBox.Text;
         settings.CustomDir = CustomDirBox.Text;
+        settings.AutoCheckUpdates = AutoCheckToggle.IsOn;
         var workers = double.IsNaN(WorkersBox.Value) ? 20 : (int)WorkersBox.Value;
         var retries = double.IsNaN(RetriesBox.Value) ? 2 : (int)RetriesBox.Value;
         if (settings.Backend == Engine.ollama)
@@ -758,9 +762,67 @@ public sealed partial class MainWindow : Window
 
     // ---------------------------------------------------------------- 更新与杂项
 
+    private void OnAutoCheckToggled(object sender, RoutedEventArgs e)
+    {
+        if (_initializing) return;
+        _settingsStore.Update(settings => settings.AutoCheckUpdates = AutoCheckToggle.IsOn);
+        SaveSettings();
+    }
+
+    /// <summary>
+    /// 启动后静默查一次。没网、被限流、已是最新都不打扰用户；
+    /// 只有确实有新版本时才在任务页顶部亮一条 InfoBar。
+    /// </summary>
+    private async Task CheckUpdatesQuietlyAsync()
+    {
+        if (!_settingsStore.Settings.AutoCheckUpdates) return;
+
+        try
+        {
+            // 让窗口先画出来，别和启动动画抢时间。
+            await Task.Delay(TimeSpan.FromSeconds(3));
+            var checker = new UpdateChecker
+            {
+                CurrentVersion = GetVersion(),
+                PreferredExtensions = new[] { ".exe" },
+            };
+            var info = await checker.CheckAsync();
+            if (info is not null) ShowUpdateBar(info);
+        }
+        catch
+        {
+            // 后台检查失败保持静默。
+        }
+    }
+
+    private void ShowUpdateBar(UpdateInfo info)
+    {
+        _updateInfo = info;
+        UpdateBar.Title = $"发现新版本 {info.Version}";
+        UpdateBar.Message = $"当前版本 {GetVersion()}，可以在下载页查看更新说明。";
+        UpdateBar.IsOpen = true;
+    }
+
+    private async void OnUpdateView(object sender, RoutedEventArgs e)
+    {
+        if (_updateInfo is null) return;
+        try
+        {
+            await Launcher.LaunchUriAsync(new Uri(_updateInfo.PageUrl));
+        }
+        catch (Exception error)
+        {
+            await ShowMessageAsync(error.Message);
+        }
+    }
+
     private async void OnCheckUpdates(object sender, RoutedEventArgs e)
     {
-        var checker = new UpdateChecker { CurrentVersion = GetVersion() };
+        var checker = new UpdateChecker
+        {
+            CurrentVersion = GetVersion(),
+            PreferredExtensions = new[] { ".exe" },
+        };
         try
         {
             var info = await checker.CheckAsync();

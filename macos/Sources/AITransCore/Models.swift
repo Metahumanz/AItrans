@@ -92,11 +92,35 @@ public struct AppSettings: Sendable, Equatable, Codable {
     public var apiRetries: Int = 2
     public var ollamaWorkers: Int = 2
     public var ollamaRetries: Int = 1
+    public var autoCheckUpdates: Bool = true
 
     public init() {}
 
+    /// 手写解码：老版本 settings.json 里没有 `auto_check_updates` 等新键，
+    /// 合成实现会直接抛错并丢掉整份设置，这里逐项 `decodeIfPresent` 回退到默认值。
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        backend = try container.decodeIfPresent(Engine.self, forKey: .backend) ?? .api
+        apiModel = try container.decodeIfPresent(String.self, forKey: .apiModel) ?? ""
+        ollamaModel = try container.decodeIfPresent(String.self, forKey: .ollamaModel) ?? "qwen2.5"
+        lang = try container.decodeIfPresent(Language.self, forKey: .lang) ?? .zh
+        translate = try container.decodeIfPresent(Bool.self, forKey: .translate) ?? true
+        polish = try container.decodeIfPresent(Bool.self, forKey: .polish) ?? true
+        outputMode = try container.decodeIfPresent(OutputMode.self, forKey: .outputMode) ?? .source
+        suffix = try container.decodeIfPresent(String.self, forKey: .suffix) ?? "_translated"
+        customDir = try container.decodeIfPresent(String.self, forKey: .customDir) ?? ""
+        force = try container.decodeIfPresent(Bool.self, forKey: .force) ?? false
+        apiWorkers = try container.decodeIfPresent(Int.self, forKey: .apiWorkers) ?? 20
+        apiRetries = try container.decodeIfPresent(Int.self, forKey: .apiRetries) ?? 2
+        ollamaWorkers = try container.decodeIfPresent(Int.self, forKey: .ollamaWorkers) ?? 2
+        ollamaRetries = try container.decodeIfPresent(Int.self, forKey: .ollamaRetries) ?? 1
+        autoCheckUpdates = try container.decodeIfPresent(Bool.self, forKey: .autoCheckUpdates) ?? true
+    }
+
     enum CodingKeys: String, CodingKey {
         case version, backend, lang, translate, polish, suffix, force
+        case autoCheckUpdates = "auto_check_updates"
         case apiModel = "api_model"
         case ollamaModel = "ollama_model"
         case outputMode = "output_mode"

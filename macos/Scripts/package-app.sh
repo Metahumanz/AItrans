@@ -1,8 +1,8 @@
 #!/bin/bash
-# 把 SwiftPM 产物打成 AITrans.app，并压缩为可分发的 zip。
+# 把 SwiftPM 产物打成 AITrans.app，压缩为 zip，并制作 dmg。
 #
 # 用法：macos/Scripts/package-app.sh [版本号]
-# 产物：macos/dist/AITrans.app、macos/dist/AITrans-<版本>-arm64.zip
+# 产物：macos/dist/AITrans.app、AITrans-<版本>-<arch>.zip、AITrans-<版本>-<arch>.dmg
 
 set -euo pipefail
 
@@ -81,6 +81,16 @@ ARCH="$(uname -m)"
 ZIP="$DIST/AITrans-${VERSION}-${ARCH}.zip"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 
+# dmg 里放一个 /Applications 软链，用户拖进去就是安装。
+echo "==> 制作 dmg"
+DMG="$DIST/AITrans-${VERSION}-${ARCH}.dmg"
+STAGE="$(mktemp -d)"
+cp -R "$APP" "$STAGE/AITrans.app"
+ln -s /Applications "$STAGE/Applications"
+hdiutil create -quiet -volname "AITrans" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+rm -rf "$STAGE"
+
 echo "完成："
 echo "  $APP"
 echo "  $ZIP"
+echo "  $DMG"

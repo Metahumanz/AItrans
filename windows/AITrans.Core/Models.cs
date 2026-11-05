@@ -76,6 +76,7 @@ public sealed class AppSettings
     [JsonPropertyName("api_retries")] public int ApiRetries { get; set; } = 2;
     [JsonPropertyName("ollama_workers")] public int OllamaWorkers { get; set; } = 2;
     [JsonPropertyName("ollama_retries")] public int OllamaRetries { get; set; } = 1;
+    [JsonPropertyName("auto_check_updates")] public bool AutoCheckUpdates { get; set; } = true;
 
     public AppSettings Clone() => (AppSettings)MemberwiseClone();
 

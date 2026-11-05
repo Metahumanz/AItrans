@@ -26,9 +26,15 @@ git push origin v2.0.0
 
 | 平台 | 产物 | 说明 |
 | --- | --- | --- |
+| macOS | `AITrans-<version>-arm64.dmg` | 磁盘映像（约 400 KB），打开后把 App 拖进「应用程序」 |
 | macOS | `AITrans-<version>-arm64.zip` | `.app` 压缩包（约 370 KB），解压后拖入「应用程序」 |
 | Windows | `AITrans-<version>-win-x64-setup.exe` | 安装包（约 8 MB），默认按当前用户安装，带快捷方式与卸载项 |
 | Windows | `AITrans-<version>-win-x64.zip` | 免安装版：依赖运行时的目录（约 37 MB），解压后运行 `AITrans.exe` |
+
+### macOS dmg
+
+`macos/Scripts/package-app.sh` 里用 `hdiutil` 生成，卷内附带一个 `/Applications` 软链，
+用户拖进去就等于安装。zip 仍然保留（体积更小、便于脚本化）。
 
 ### Windows 安装包
 
@@ -77,16 +83,27 @@ SmartScreen 会提示「Windows 已保护你的电脑」：
 
 ## 4. 应用内更新
 
-两端共用同一套协议，避免引入额外依赖：
+两端共用同一套协议，避免引入额外依赖。请求
+`https://api.github.com/repos/Metahumanz/AItrans/releases/latest`，比较 `tag_name` 与当前版本。
 
-1. 启动后（可关闭）或手动点「检查更新」，请求
-   `https://api.github.com/repos/Metahumanz/AItrans/releases/latest`；
-2. 比较 `tag_name` 与当前版本；
-3. 有新版则展示更新说明，可「下载更新」或打开下载页；
-4. 下载 zip 到系统「下载」文件夹，并定位到该文件。
+两种触发方式：
+
+| 方式 | 行为 |
+| --- | --- |
+| 启动后自动检查 | 延迟 3 秒静默请求一次。**只在发现新版本时**在界面顶部亮一条提示条（Windows 是任务页的 InfoBar，macOS 是文件列顶部的横幅），不弹窗、不打断；没网、被限流、已是最新都保持沉默 |
+| 手动「检查更新」 | 立即请求并弹窗展示更新说明，可选「下载更新」或「打开下载页」 |
+
+自动检查可以关掉：Windows 在「关于 → 维护 → 启动时自动检查更新」，macOS 在设置面板的
+「关于」分组里。开关状态存在 `settings.json` 的 `auto_check_updates`，两端同一个键。
+
+下载时优先挑安装包：Windows 取 `*-setup.exe`，macOS 取 `*.dmg`，都没有才回退到 zip。
+文件落到系统「下载」文件夹并在资源管理器中定位。
 
 **不做静默自替换**：未签名分发下自动覆盖安装目录风险过高，替换由用户完成（退出 → 解压 → 覆盖）。
 两端都会在下载完成后给出这一步的说明。
+
+> 自动检查用的是 GitHub 的**匿名**接口，额度是每 IP 每小时 60 次。正常使用（每次启动一次）
+> 远低于这个量，但共享出口 IP 的网络里可能被限流；这种情况下检查会静默失败，不影响正常使用。
 
 不使用 Sparkle / Velopack 的原因：两者在**未签名**分发下都会遇到额外限制（Sparkle 依赖代码签名校验与公证流程，Velopack 主要面向签名安装包）。自更新实现约 200 行，行为可控。
 

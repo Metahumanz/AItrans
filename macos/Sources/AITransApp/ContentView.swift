@@ -128,6 +128,11 @@ struct ContentView: View {
 
     private var fileColumn: some View {
         VStack(spacing: 0) {
+            if let update = state.backgroundUpdate {
+                updateBanner(update)
+                Divider()
+            }
+
             HStack(spacing: 8) {
                 TextField("粘贴文件或文件夹路径", text: $pathInput)
                     .textFieldStyle(.roundedBorder)
@@ -168,6 +173,38 @@ struct ContentView: View {
                     .allowsHitTesting(false)
             }
         }
+    }
+
+    private func updateBanner(_ update: UpdateInfo) -> some View {
+        let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        return HStack(spacing: 10) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.title3)
+                .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("发现新版本 \(update.version)")
+                    .font(.callout.weight(.semibold))
+                Text("当前版本 \(current)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Button("查看更新") {
+                state.backgroundUpdate = nil
+                state.updateInfo = update
+            }
+            Button {
+                state.backgroundUpdate = nil
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("这次不提示")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.accentColor.opacity(0.08))
     }
 
     private var emptyState: some View {
@@ -269,6 +306,7 @@ struct ContentView: View {
 
             Section("关于") {
                 LabeledContent("版本", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
+                Toggle("启动时自动检查更新", isOn: $state.settings.autoCheckUpdates)
                 Button("检查更新…") { state.checkForUpdates() }
                     .disabled(state.isCheckingUpdate)
                 Button("管理提供商…") { showProviders = true }
