@@ -25,8 +25,9 @@ git push origin v2.0.0
 发布步骤是幂等的：Release 已存在就补传（`--clobber`），不存在才创建；两个平台同时创建时，
 后到的一方会退回补传。
 
-Release 正文由工作流生成：首次打开说明、macOS 钥匙串迁移提示，以及本次提交列表。迁移提示写死在
-两个工作流里，不依赖 commit message，避免用户只看 Release 正文时漏掉“升级后需重填 Key”。
+Release 正文由 `.github/actions/release-notes` 统一生成：首次打开说明、按版本区间的升级提示，以及
+本次提交列表。升级提示只在 `0.3.x` 输出（钥匙串 → `secrets.json` 的迁移只影响这一代），之后的版本不再
+重复；两个平台共用同一个 composite action，改一处即可，不依赖 commit message。
 
 ## 2. 产物
 

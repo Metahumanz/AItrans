@@ -61,6 +61,12 @@ powershell -ExecutionPolicy Bypass -File windows\scripts\verify.ps1 -Publish
 | Ollama 请求/响应格式 | `OllamaClientTests` | 原生 `/api/chat`，非流式 |
 | 提供商校验、id 生成 | `ProviderStoreTests` | 含非法 URL、空名称、控制字符 |
 | 密钥不落 JSON | `ProviderStoreTests.SaveKeepsSecretsOutOfJson` | DPAPI 存储 |
+| 密钥懒加载 | `ProviderStoreTests.LoadDefersSecretReadsUntilHydrate` | 载入不读 secrets.dat |
+| 旧明文迁移 | `ProviderStoreTests.MigratePlaintextKeysRewritesProvidersFile` | 迁移后文件无明文，重复调用为空操作 |
+| 空值即删除 | `ProviderStoreTests.MemoryStoreTreatsEmptyAsDelete` / `DpapiStoreTreatsEmptyAsDelete` | 与 macOS 语义一致 |
+| 清除密钥 | `ProviderStoreTests.ClearKeyRemovesSecretButKeepsProvider` | 提供商保留 |
+| 损坏文件可见 | `ProviderStoreTests.DpapiStoreSurfacesCorruptFile` | 不再静默当成没有密钥 |
+| 删除失败保留提供商 | `ProviderStoreTests.DeleteKeepsProviderWhenSecretDeletionFails` | |
 | 旧配置导入 | `ProviderStoreTests.ImportsLegacyEnvFile` | `.env` 与 `providers.json` |
 | 设置取值收敛 | `SettingsStoreTests.SanitizesOutOfRangeValues` | 并发/重试/后缀 |
 | 版本比较 | `UpdateCheckerTests.ComparesVersions` | 语义化版本 |
@@ -97,6 +103,10 @@ Passed!  - Failed:     0, Passed:    50+, Skipped:     0, Total:    50+
 - [ ] 任务进行中「取消」能及时停止
 - [ ] 提供商页「添加」弹出编辑对话框；保存后出现在列表并标记「使用中」
 - [ ] 提供商页「测试连接」：正常 Key 返回 200，错误 Key 提示鉴权失败
+- [ ] 编辑已存密钥的提供商时，对话框里能看到原 Key（不显示为空）
+- [ ] 「清除已保存的密钥」保存后生效；取消对话框不会删 Key
+- [ ] `requires_key` 为真的提供商没有 Key 时，开始任务给出提示，而不是发无鉴权请求
+- [ ] 预设的「需要 API Key」勾选状态能带出（本地 Ollama 预设为未勾选）
 
 ### 真实服务
 
@@ -109,6 +119,8 @@ Passed!  - Failed:     0, Passed:    50+, Skipped:     0, Total:    50+
 ### 系统集成
 
 - [ ] API Key 在 `%APPDATA%\AITrans\secrets.dat`（DPAPI 加密），`providers.json` 中无明文
+- [ ] 启动阶段不读 `secrets.dat`；开始任务 / 测试连接 / 打开编辑对话框时才读取
+- [ ] 手动改坏 `secrets.dat` 后启动，会弹出带路径的可读错误，而不是静默丢 Key
 - [ ] 「检查更新」能读到 GitHub 最新 release
 - [ ] 启动约 3 秒后自动检查一次；有新版本时任务页顶部出现提示条（不弹窗），「查看更新」能打开下载页
 - [ ] 「关于 → 维护」里关掉自动检查后，重启不再自动请求

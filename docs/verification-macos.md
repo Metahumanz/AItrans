@@ -75,9 +75,12 @@ open dist/AITrans.app
 - [ ] 「测试连接」对错误 Key 返回鉴权失败
 - [x] API Key 保存在 `~/Library/Application Support/AITrans/secrets.json`（0600），`providers.json` 中无明文
 - [x] 正常启动不读 `secrets.json`；首次开始任务、测试连接或打开提供商编辑面板时才读取。若检测到旧版明文 key，启动阶段会读写一次以完成迁移
+- [x] 读取密钥不会创建目录或 `secrets.json.lock`（只有写入才加锁）
 - [x] 删除提供商时对应 key 从 `secrets.json` 移除
+- [x] 「清除已保存的密钥」能删掉条目但保留提供商；`providers.json` 不变
 - [ ] 旧钥匙串条目不参与读取；升级后需要重新填写一次 API Key
 - [ ] 「从旧版导入…」能导入 v1 的 `providers.json`
+- [ ] `secrets.json` 损坏时删除提供商失败，提示里给出文件路径和手工处理方式
 
 ## 7. 界面
 
