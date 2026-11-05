@@ -6,7 +6,7 @@
 import Foundation
 
 public struct OllamaClient: ChatCompleting {
-    public static let defaultBaseURL = "http://127.0.0.1:11434"
+    public static let defaultBaseURL = "http://localhost:11434"
 
     public let baseURL: String
     public let model: String

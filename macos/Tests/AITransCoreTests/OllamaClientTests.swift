@@ -12,6 +12,14 @@ final class OllamaClientTests: XCTestCase {
         XCTAssertEqual(request.httpMethod, "POST")
     }
 
+    func testDefaultBaseURLUsesLocalhostHostname() throws {
+        XCTAssertEqual(OllamaClient.defaultBaseURL, "http://localhost:11434")
+
+        let client = OllamaClient(model: "qwen2.5")
+        let request = try client.makeRequest(messages: [.user("hi")])
+        XCTAssertEqual(request.url?.absoluteString, "http://localhost:11434/api/chat")
+    }
+
     func testPayloadUsesNonStreamingNativeShape() throws {
         let client = OllamaClient(model: "qwen2.5")
         let data = try client.makePayload(messages: [.user("你好")])

@@ -127,8 +127,14 @@ final class ChatClientTests: XCTestCase {
             domain: NSURLErrorDomain,
             code: NSURLErrorAppTransportSecurityRequiresSecureConnection
         )
+        XCTAssertTrue(ChatClient.isAppTransportSecurityError(error))
         let message = ChatClient.transportMessage(error)
         XCTAssertTrue(message.contains("https"), "应提示改用 https：\(message)")
         XCTAssertTrue(message.contains("明文 HTTP"), "应说明是明文 HTTP 被拦截：\(message)")
+    }
+
+    func testNonATSErrorIsNotMisclassified() {
+        let error = NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut)
+        XCTAssertFalse(ChatClient.isAppTransportSecurityError(error))
     }
 }

@@ -170,16 +170,24 @@ public struct ChatClient: ChatCompleting {
         return body.isEmpty ? "HTTP \(status)" : "HTTP \(status): \(body)"
     }
 
+    /// 是否是 macOS ATS 拦截明文 HTTP 的错误。
+    public static func isAppTransportSecurityError(_ error: Error) -> Bool {
+        let ns = error as NSError
+        return ns.domain == NSURLErrorDomain
+            && ns.code == NSURLErrorAppTransportSecurityRequiresSecureConnection
+    }
+
     static func transportMessage(_ error: Error) -> String {
         let ns = error as NSError
+        if isAppTransportSecurityError(error) {
+            return "网络错误：macOS 不允许明文 HTTP，请把接口地址改为 https://（本机或局域网地址除外）"
+        }
         if ns.domain == NSURLErrorDomain {
             switch ns.code {
             case NSURLErrorTimedOut: return "网络错误：请求超时"
             case NSURLErrorNotConnectedToInternet: return "网络错误：没有网络连接"
             case NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost:
                 return "网络错误：无法连接服务器"
-            case NSURLErrorAppTransportSecurityRequiresSecureConnection:
-                return "网络错误：macOS 不允许明文 HTTP，请把接口地址改为 https://（本机或局域网地址除外）"
             default: return "网络错误：\(ns.localizedDescription)"
             }
         }

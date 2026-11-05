@@ -16,7 +16,7 @@ swift test
 open dist/AITrans.app
 ```
 
-- [x] 测试全绿（当前 60 个，其中 2 个真实接口用例默认跳过；v0.3.4 的 release 工作流已在 macos-15 上跑过）
+- [x] 测试全绿（当前 62 个，其中 2 个真实接口用例默认跳过；v0.3.4 的 release 工作流已在 macos-15 上跑过）
 - [x] 打包生成 `macos/dist/AITrans.app`、zip 与 dmg
 - [x] 启动后出现主窗口（本机用 `open` 验证，窗口 900×612）
 - [ ] 双击启动后菜单栏显示 AITrans
@@ -108,7 +108,7 @@ open dist/AITrans.app
 
 已验证：
 
-- `swift test --disable-sandbox`：60 个测试，2 个跳过，0 失败（2026-11-05 本机重跑；v0.3.4 的 Release macOS 工作流在 macos-15 上执行）。
+- `swift test --disable-sandbox`：62 个测试，2 个跳过，0 失败（2026-11-05 本机重跑；v0.3.4 的 Release macOS 工作流在 macos-15 上执行）。
 - `package-app.sh 0.3.2` 能生成 `AITrans.app`、zip 和 dmg。
 - `package-app.sh 0.3.4` 能生成 app / zip / dmg；本地 dmg 可挂载、版本 0.3.4、卷内 `Applications` 软链与 ad-hoc 签名校验通过（2026-11-05）。
 - Release v0.3.2 的 dmg 能挂载：UDZO/UDIF、尾部 `koly`、卷内 `Applications -> /Applications` 软链、App 版本 0.3.2、ad-hoc 签名校验通过。
@@ -122,7 +122,7 @@ open dist/AITrans.app
 - `v0.3.1` 及以前使用钥匙串；`v0.3.2` 起使用本地 `secrets.json`。
 - 旧钥匙串条目不自动迁移；升级到本地文件版本后，需要在提供商里重新填写一次 API Key。
 - `secrets.json` 是明文 0600，不再有 Keychain ACL 保护；这是脱离钥匙串的取舍。
-- macOS ATS 只放行本机/局域网明文 HTTP；公网 `http://` 提供商在保存时会被拒绝，需改用 `https://`（Windows 无此限制）。
+- macOS ATS 只放行本机/局域网明文 HTTP；公网 `http://` 提供商在保存时会被拒绝，需改用 `https://`（Windows 无此限制）。打包 App 的 `Info.plist` 已为 `localhost`、回环与私有网段声明 `NSExceptionDomains`，覆盖 macOS 14+ 对 IP 字面量的限制。
 - 尚未验证：横幅/InfoBar 视觉、开关点击、拖拽、真实翻译与 Gatekeeper 双击拦截流程。
 - `spctl -a` 对 ad-hoc 包返回 `rejected`，这是未签名/未公证的预期结果；本机没有 quarantine 属性，所以 `open` 能直接启动。
 

@@ -375,8 +375,7 @@ final class AppState: ObservableObject {
             let body = String(decoding: data.prefix(160), as: UTF8.self)
             return "HTTP \(status)\(body.isEmpty ? "" : "：\(body)")"
         } catch {
-            let ns = error as NSError
-            if ns.domain == NSURLErrorDomain, ns.code == NSURLErrorAppTransportSecurityRequiresSecureConnection {
+            if ChatClient.isAppTransportSecurityError(error) {
                 return "macOS 不允许公网明文 HTTP，请把接口地址改为 https://（本机或局域网地址除外）"
             }
             return "连接失败：\(error.localizedDescription)"
