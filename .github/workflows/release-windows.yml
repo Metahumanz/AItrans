@@ -65,7 +65,9 @@ jobs:
             echo "runner 上没有 Inno Setup，先装一个"
             choco install innosetup --no-progress -y
           fi
-          "$ISCC" "/DMyAppVersion=${VERSION}" installer/AITrans.iss
+          # Git Bash（MSYS）会把 /DMyAppVersion=... 当路径改写，ISCC 会认为传了两个脚本名，
+          # 所以这个参数要关掉路径转换。
+          MSYS2_ARG_CONV_EXCL='*' "$ISCC" "/DMyAppVersion=${VERSION}" installer/AITrans.iss
           test -f "dist/AITrans-${VERSION}-win-x64-setup.exe" || { echo "安装包没生成"; exit 1; }
           ls -l dist/*-setup.exe
 
