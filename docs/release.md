@@ -1,6 +1,6 @@
 # 发布与更新
 
-> 状态：`v0.2.0` 已走通完整流程——tag 推送 → 双端构建 → 创建 Release，产物可下载。
+> 状态：`v0.2.1` 已走通完整流程——tag 推送 → 双端构建 → 创建 Release，产物可下载。
 
 ## 1. 发布方式
 
@@ -36,7 +36,7 @@ git push origin v2.0.0
 发布工作流里自动编译，本地也可以直接跑：
 
 ```sh
-ISCC.exe /DMyAppVersion=0.2.0 /DSourceDir=..\dist\app windows\installer\AITrans.iss
+ISCC.exe /DMyAppVersion=0.2.1 /DSourceDir=..\dist\app windows\installer\AITrans.iss
 ```
 
 - 默认装到 `%LocalAppData%\Programs\AITrans`，**不需要管理员权限**；
