@@ -33,7 +33,7 @@ AItrans/
 
 ```sh
 # macOS
-cd macos && swift test && ../macos/Scripts/package-app.sh 0.1.0
+cd macos && swift test && ../macos/Scripts/package-app.sh 0.2.0
 # 产物：macos/dist/AITrans.app
 
 # Windows
