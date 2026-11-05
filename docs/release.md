@@ -1,6 +1,7 @@
 # 发布与更新
 
-> 状态：`v0.3.1` 为当前版本；`v0.3.0` 已走通完整流程——tag 推送 → 双端构建 → 创建 Release，产物可下载。
+> 状态：`v0.3.1` 为当前发布版本；`v0.3.0` 已走通完整流程——tag 推送 → 双端构建 → 创建 Release，产物可下载。
+> 当前代码已把 macOS 密钥改为本地 `secrets.json`（0600），尚未发版；`v0.3.1` 发布包仍是钥匙串实现。
 > 仓库已设为**公开**，应用内的匿名检查更新（`api.github.com/repos/Metahumanz/AItrans/releases/latest`）
 > 才能拿到数据；如果以后改回私有，检查更新会静默失效。
 
@@ -28,7 +29,7 @@ git push origin v2.0.0
 
 | 平台 | 产物 | 说明 |
 | --- | --- | --- |
-| macOS | `AITrans-<version>-arm64.dmg` | 磁盘映像（约 0.8 MB），打开后把 App 拖进「应用程序」 |
+| macOS | `AITrans-<version>-arm64.dmg` | 磁盘映像（约 0.5 MB），打开后把 App 拖进「应用程序」 |
 | macOS | `AITrans-<version>-arm64.zip` | `.app` 压缩包（约 0.5 MB），解压后拖入「应用程序」 |
 | Windows | `AITrans-<version>-win-x64-setup.exe` | 安装包（约 8 MB），默认按当前用户安装，带快捷方式与卸载项 |
 | Windows | `AITrans-<version>-win-x64.zip` | 免安装版：依赖运行时的目录（约 10 MB），解压后运行 `AITrans.exe` |

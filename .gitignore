@@ -3,6 +3,8 @@
 .env*.local
 providers.json
 settings.json
+secrets.json
+secrets.dat
 
 # Python
 __pycache__/

@@ -67,7 +67,7 @@ ISCC.exe /DMyAppVersion=0.3.1 windows\installer\AITrans.iss
 - 输出到源文件目录（加后缀）、应用输出目录或自定义目录；
 - 并发与重试可调，任务可取消，进度与结果逐文件展示；
 - 提供商管理：9 个预设、增删改、切换、连通性测试；
-- 密钥存系统钥匙串（macOS Keychain / Windows DPAPI），不写明文文件；
+- 密钥保存在本地：macOS 用 `secrets.json`（0600，不使用钥匙串），Windows 用 DPAPI 加密的 `secrets.dat`；`providers.json` 中不写明文；
 - 应用内检查更新：启动后静默查一次（可关），发现新版本在界面顶部提示；下载到「下载」文件夹后按提示覆盖。
 
 ### 开发约定

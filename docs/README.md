@@ -16,7 +16,7 @@ v2 是双原生客户端：macOS 用 SwiftUI，Windows 用 C# + .NET + WinUI 3�
 ## 只留本地
 
 `docs/local/` 已加入 `.gitignore`，用于放方案草稿、排期与个人笔记，不随仓库分发。
-当前本地保存的是最初的技术选型与路线对比（`native-client-plan.md`）。
+旧的 `native-client-plan.md` 已过时并删除；需要新的方案草稿时再在本地新建。
 
 ## 为什么这样分
 

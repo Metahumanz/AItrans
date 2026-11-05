@@ -11,6 +11,7 @@ public enum AppPaths {
 
     public static var settingsFile: URL { supportDirectory.appending(path: "settings.json") }
     public static var providersFile: URL { supportDirectory.appending(path: "providers.json") }
+    public static var secretsFile: URL { supportDirectory.appending(path: "secrets.json") }
     public static var defaultOutputDirectory: URL {
         supportDirectory.appending(path: "output", directoryHint: .isDirectory)
     }

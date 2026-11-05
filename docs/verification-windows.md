@@ -108,7 +108,7 @@ Passed!  - Failed:     0, Passed:    50+, Skipped:     0, Total:    50+
 
 ### 系统集成
 
-- [ ] API Key 出现在「凭据管理器」或 `%APPDATA%\AITrans\secrets.dat`（加密），`providers.json` 中无明文
+- [ ] API Key 在 `%APPDATA%\AITrans\secrets.dat`（DPAPI 加密），`providers.json` 中无明文
 - [ ] 「检查更新」能读到 GitHub 最新 release
 - [ ] 启动约 3 秒后自动检查一次；有新版本时任务页顶部出现提示条（不弹窗），「查看更新」能打开下载页
 - [ ] 「关于 → 维护」里关掉自动检查后，重启不再自动请求

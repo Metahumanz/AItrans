@@ -62,7 +62,7 @@ Windows 端保持一一对应的模块划分，便于逐项对照。
 | 项 | v1 | v2 |
 | --- | --- | --- |
 | 界面 | 浏览器 + 本地 HTTP 服务 | 原生窗口 |
-| 密钥存储 | `.env` / `providers.json` | 系统钥匙串（macOS Keychain / Windows Credential Manager） |
+| 密钥存储 | `.env` / `providers.json` | macOS 本地 `secrets.json`（0600）；Windows DPAPI `secrets.dat` |
 | 文件路径 | 受浏览器限制，需服务端代写 | 直接读写 |
 | CLI 入口 | `legacy/` 四个脚本 | 新 GUI 不含；仓库保留 |
 | 更新 | 手动 | 应用内检查 + 下载安装 |

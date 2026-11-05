@@ -26,7 +26,7 @@ public sealed class MemorySecretStore : ISecretStore
 
 /// <summary>
 /// 用 Windows DPAPI 按当前用户加密密钥，落盘为一个不透明文件。
-/// 与 macOS 的钥匙串对应：密钥不进入 providers.json。
+/// 与 macOS 的本地 secrets.json 对应：密钥不进入 providers.json。
 /// </summary>
 public sealed class DpapiSecretStore : ISecretStore
 {

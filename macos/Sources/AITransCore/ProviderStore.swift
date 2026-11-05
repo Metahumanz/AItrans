@@ -1,10 +1,10 @@
 // ProviderStore.swift - 提供商配置与密钥存储
 //
-// 与 v1 的差异：API Key 不再写进 providers.json，而是进系统钥匙串。
+// 与 v1 的差异：API Key 不写进 providers.json，而是保存在本地 secrets.json（0600）。
+// 不使用 macOS 钥匙串：避免 ad-hoc 签名变化后每次升级都触发 ACL 授权框。
 // JSON 结构保持兼容，便于从旧文件导入。
 
 import Foundation
-import Security
 
 // MARK: - 密钥存储
 
@@ -14,59 +14,58 @@ public protocol SecretStoring: AnyObject, Sendable {
     func deleteSecret(for id: String) throws
 }
 
-/// macOS 钥匙串实现。
-public final class KeychainSecretStore: SecretStoring, @unchecked Sendable {
-    private let service: String
+/// 本地密钥文件实现。
+///
+/// 密钥保存在 `secrets.json`，文件权限 0600；不进入 `providers.json`，也不访问钥匙串。
+/// 代价是文件本身为明文，安全性依赖用户目录权限；这是为了摆脱 Keychain ACL 授权框做的取舍。
+public final class FileSecretStore: SecretStoring, @unchecked Sendable {
+    private let path: URL
+    private let lock = NSLock()
 
-    public init(service: String = "com.metahumanz.aitrans.provider") {
-        self.service = service
+    public init(path: URL = AppPaths.secretsFile) {
+        self.path = path
     }
 
-    private func query(for id: String) -> [String: Any] {
-        [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: id,
-        ]
+    private func load() throws -> [String: String] {
+        guard FileManager.default.fileExists(atPath: path.path) else { return [:] }
+        let data = try Data(contentsOf: path)
+        guard !data.isEmpty else { return [:] }
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: String] else {
+            throw AITransError("密钥文件格式不正确：\(path.lastPathComponent)")
+        }
+        return object
+    }
+
+    private func save(_ values: [String: String]) throws {
+        let directory = path.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let data = try JSONSerialization.data(withJSONObject: values, options: [.prettyPrinted, .sortedKeys])
+        try data.write(to: path, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path.path)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
     }
 
     public func secret(for id: String) throws -> String? {
-        var request = query(for: id)
-        request[kSecReturnData as String] = true
-        request[kSecMatchLimit as String] = kSecMatchLimitOne
-
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(request as CFDictionary, &item)
-        if status == errSecItemNotFound { return nil }
-        guard status == errSecSuccess, let data = item as? Data else {
-            throw AITransError("读取钥匙串失败（\(status)）")
-        }
-        return String(data: data, encoding: .utf8)
+        lock.lock(); defer { lock.unlock() }
+        return try load()[id]
     }
 
     public func setSecret(_ value: String, for id: String) throws {
-        let data = Data(value.utf8)
-        let base = query(for: id)
-        let attributes: [String: Any] = [kSecValueData as String: data]
-
-        let updateStatus = SecItemUpdate(base as CFDictionary, attributes as CFDictionary)
-        if updateStatus == errSecSuccess { return }
-        guard updateStatus == errSecItemNotFound else {
-            throw AITransError("写入钥匙串失败（\(updateStatus)）")
+        lock.lock(); defer { lock.unlock() }
+        var values = try load()
+        if value.isEmpty {
+            values.removeValue(forKey: id)
+        } else {
+            values[id] = value
         }
-
-        var insert = base
-        insert[kSecValueData as String] = data
-        let addStatus = SecItemAdd(insert as CFDictionary, nil)
-        guard addStatus == errSecSuccess else {
-            throw AITransError("写入钥匙串失败（\(addStatus)）")
-        }
+        try save(values)
     }
 
     public func deleteSecret(for id: String) throws {
-        let status = SecItemDelete(query(for: id) as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw AITransError("删除钥匙串条目失败（\(status)）")
+        lock.lock(); defer { lock.unlock() }
+        var values = try load()
+        if values.removeValue(forKey: id) != nil {
+            try save(values)
         }
     }
 }
@@ -176,7 +175,7 @@ public final class ProviderStore: @unchecked Sendable {
 
     private let secrets: SecretStoring
 
-    public init(secrets: SecretStoring = KeychainSecretStore()) {
+    public init(secrets: SecretStoring = FileSecretStore()) {
         self.secrets = secrets
     }
 
@@ -189,10 +188,9 @@ public final class ProviderStore: @unchecked Sendable {
         providers.first { $0.id == id }
     }
 
-    /// 按需从钥匙串补齐密钥。
+    /// 按需从本地密钥文件补齐密钥。
     ///
-    /// 启动时只读 providers.json，不碰钥匙串：旧版本留下的条目 ACL 往往只认旧签名，
-    /// 一启动就读取会让升级后的第一次打开卡在授权框上。真正要发请求或编辑提供商时再调用这里。
+    /// 启动时只读 providers.json，不碰 secrets.json；真正要发请求或编辑提供商时再调用这里。
     public func hydrate(_ provider: Provider) throws -> Provider {
         guard provider.apiKey.isEmpty, !provider.id.isEmpty else { return provider }
         var hydrated = provider
@@ -208,7 +206,7 @@ public final class ProviderStore: @unchecked Sendable {
 
     // MARK: 读写
 
-    /// 读取 providers.json；只解析文件，不访问钥匙串。
+    /// 读取 providers.json；只解析文件，不读取密钥。
     ///
     /// 旧文件里的明文 `api_key` 会先留在内存里，等 `hydrate` 或 `save` 时再迁移。
     public func load(from url: URL) throws {
@@ -233,7 +231,7 @@ public final class ProviderStore: @unchecked Sendable {
                 apiKey: item["api_key"] as? String ?? "",
                 requiresKey: item["requires_key"] as? Bool ?? true
             )
-            // 旧文件里的明文 key 先留在内存里，避免启动时访问钥匙串。
+            // 旧文件里的明文 key 先留在内存里，避免启动时读取密钥文件。
             loaded.append(provider)
         }
         providers = loaded
@@ -243,9 +241,9 @@ public final class ProviderStore: @unchecked Sendable {
         }
     }
 
-    /// 保存 providers.json；密钥只进钥匙串。
+    /// 保存 providers.json；密钥只进本地 secrets.json。
     ///
-    /// 旧文件里的明文 key 在这里迁移；启动加载时不碰钥匙串。
+    /// 旧文件里的明文 key 在这里迁移；启动加载时不读取密钥文件。
     public func save(to url: URL) throws {
         for provider in providers where !provider.apiKey.isEmpty {
             try secrets.setSecret(provider.apiKey, for: provider.id)

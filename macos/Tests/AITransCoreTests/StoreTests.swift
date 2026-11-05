@@ -91,12 +91,12 @@ final class ProviderStoreTests: XCTestCase {
         let reloaded = ProviderStore(secrets: secrets)
         try reloaded.load(from: path)
         XCTAssertEqual(reloaded.activeID, "acme")
-        XCTAssertEqual(reloaded.provider(id: "acme")?.apiKey, "", "加载阶段不应读钥匙串")
+        XCTAssertEqual(reloaded.provider(id: "acme")?.apiKey, "", "加载阶段不应读密钥存储")
         let hydrated = try reloaded.hydrate(XCTUnwrap(reloaded.provider(id: "acme")))
         XCTAssertEqual(hydrated.apiKey, "sk-secret")
     }
 
-    func testLoadDefersKeychainReadsUntilHydrate() throws {
+    func testLoadDefersSecretReadsUntilHydrate() throws {
         let secrets = CountingSecretStore()
         let writer = ProviderStore(secrets: secrets)
         _ = try writer.upsert(sample(id: "acme"), activate: true)
@@ -107,7 +107,7 @@ final class ProviderStoreTests: XCTestCase {
 
         let store = ProviderStore(secrets: secrets)
         try store.load(from: path)
-        XCTAssertEqual(secrets.reads, readsAfterWrite, "load 不应访问钥匙串")
+        XCTAssertEqual(secrets.reads, readsAfterWrite, "load 不应访问密钥存储")
         XCTAssertEqual(store.provider(id: "acme")?.apiKey, "")
 
         let hydrated = try store.hydrate(XCTUnwrap(store.provider(id: "acme")))
@@ -115,7 +115,7 @@ final class ProviderStoreTests: XCTestCase {
         XCTAssertEqual(secrets.reads, readsAfterWrite + 1)
     }
 
-    func testSaveMigratesPlaintextKeyIntoKeychain() throws {
+    func testSaveMigratesPlaintextKeyIntoSecretStore() throws {
         let path = tempDir.appending(path: "providers.json")
         let legacy = """
         {
@@ -133,19 +133,66 @@ final class ProviderStoreTests: XCTestCase {
         try store.load(from: path)
 
         XCTAssertEqual(store.provider(id: "old")?.apiKey, "sk-plain")
-        XCTAssertNil(try secrets.secret(for: "old"), "加载阶段不应写钥匙串")
+        XCTAssertNil(try secrets.secret(for: "old"), "加载阶段不应写密钥存储")
 
         try store.save(to: path)
-        XCTAssertEqual(try secrets.secret(for: "old"), "sk-plain", "保存时明文 key 应迁移到钥匙串")
+        XCTAssertEqual(try secrets.secret(for: "old"), "sk-plain", "保存时明文 key 应迁移到密钥存储")
+    }
+
+    func testFileSecretStoreRoundTripAndPermissions() throws {
+        let path = tempDir.appending(path: "secrets.json")
+        let store = FileSecretStore(path: path)
+
+        XCTAssertNil(try store.secret(for: "deepseek"))
+        try store.setSecret("sk-local", for: "deepseek")
+        XCTAssertEqual(try store.secret(for: "deepseek"), "sk-local")
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: path.path)
+        XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
+
+        try store.setSecret("", for: "deepseek")
+        XCTAssertNil(try store.secret(for: "deepseek"), "空值应删除对应条目")
+
+        try store.setSecret("sk-delete", for: "other")
+        try store.deleteSecret(for: "other")
+        XCTAssertNil(try store.secret(for: "other"))
+    }
+
+    func testFileSecretStoreRejectsCorruptFile() throws {
+        let path = tempDir.appending(path: "secrets.json")
+        try "not json".write(to: path, atomically: true, encoding: .utf8)
+
+        let store = FileSecretStore(path: path)
+        XCTAssertThrowsError(try store.secret(for: "deepseek"))
+    }
+
+    func testProviderStorePersistsSecretsInLocalFile() throws {
+        let secretsPath = tempDir.appending(path: "secrets.json")
+        let providersPath = tempDir.appending(path: "providers.json")
+        let store = ProviderStore(secrets: FileSecretStore(path: secretsPath))
+        _ = try store.upsert(sample(id: "acme"), activate: true)
+        try store.save(to: providersPath)
+
+        let providersJSON = try String(contentsOf: providersPath, encoding: .utf8)
+        XCTAssertFalse(providersJSON.contains("sk-secret"), "密钥不应写进 providers.json")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: secretsPath.path))
+
+        let reloaded = ProviderStore(secrets: FileSecretStore(path: secretsPath))
+        try reloaded.load(from: providersPath)
+        XCTAssertEqual(reloaded.provider(id: "acme")?.apiKey, "")
+        let hydrated = try reloaded.hydrate(XCTUnwrap(reloaded.provider(id: "acme")))
+        XCTAssertEqual(hydrated.apiKey, "sk-secret")
     }
 
     func testDeleteClearsActiveWhenNeeded() throws {
-        let store = ProviderStore(secrets: MemorySecretStore())
+        let secrets = MemorySecretStore()
+        let store = ProviderStore(secrets: secrets)
         _ = try store.upsert(sample(id: "one"), activate: true)
         _ = try store.upsert(sample(id: "two", name: "第二个"))
 
         try store.delete(id: "one")
         XCTAssertEqual(store.activeID, "two")
+        XCTAssertNil(try secrets.secret(for: "one"), "删除提供商时应同时删除密钥")
     }
 
     func testImportLegacyEnv() throws {

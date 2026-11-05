@@ -162,6 +162,10 @@ final class AppState: ObservableObject {
                 return
             }
         }
+        if !usesOllama, let provider, provider.requiresKey, provider.apiKey.isEmpty {
+            alertMessage = "该提供商还没有 API Key。密钥现在保存在本地文件，请在「提供商」里填写。"
+            return
+        }
 
         let model = usesOllama
             ? settings.ollamaModel.trimmingCharacters(in: .whitespaces)
@@ -256,7 +260,7 @@ final class AppState: ObservableObject {
 
     // MARK: - 提供商
 
-    /// 编辑前按需补齐密钥；打开提供商面板时才会读钥匙串。
+    /// 编辑前按需补齐密钥；打开提供商面板时才会读本地密钥文件。
     func providerForEditing(_ provider: Provider) -> Provider {
         do {
             return try providerStore.hydrate(provider)
