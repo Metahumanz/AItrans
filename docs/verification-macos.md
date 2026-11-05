@@ -12,7 +12,7 @@
 ```sh
 cd macos
 swift test
-../macos/Scripts/package-app.sh 0.3.1
+../macos/Scripts/package-app.sh 0.3.2
 open dist/AITrans.app
 ```
 
@@ -105,14 +105,14 @@ open dist/AITrans.app
 已验证：
 
 - 本地 `swift test --disable-sandbox`：49 个测试执行，0 失败，2 个跳过。
-- `package-app.sh 0.3.1` 能生成 `AITrans.app`、zip 和 dmg。
-- Release v0.3.1 的 dmg 能挂载：UDZO/UDIF、尾部 `koly`、卷内 `Applications -> /Applications` 软链、App 版本 0.3.1、ad-hoc 签名校验通过。
-- 用真实配置启动 v0.3.1：主窗口 900×612，启动阶段不读密钥，无授权框。
-- 当前代码已把 macOS 密钥存储改为本地 `secrets.json`（0600）：启动只解析 `providers.json`，开始任务、测试连接、打开提供商编辑面板时才按需读取。
+- `package-app.sh 0.3.2` 能生成 `AITrans.app`、zip 和 dmg。
+- Release v0.3.2 的 dmg 能挂载：UDZO/UDIF、尾部 `koly`、卷内 `Applications -> /Applications` 软链、App 版本 0.3.2、ad-hoc 签名校验通过。
+- 用真实配置启动 v0.3.2：主窗口 900×612，启动阶段不读密钥，无授权框。
+- v0.3.2 起 macOS 密钥保存在本地 `secrets.json`（0600）：启动只解析 `providers.json`，开始任务、测试连接、打开提供商编辑面板时才按需读取。
 
 已知限制：
 
-- v0.3.1 发布包仍是钥匙串实现；本地密钥文件改动尚未发版。
+- `v0.3.1` 及以前使用钥匙串；`v0.3.2` 起使用本地 `secrets.json`。
 - 旧钥匙串条目不自动迁移；升级到本地文件版本后，需要在提供商里重新填写一次 API Key。
 - `secrets.json` 是明文 0600，不再有 Keychain ACL 保护；这是脱离钥匙串的取舍。
 - 尚未验证：横幅/InfoBar 视觉、开关点击、拖拽、真实翻译与 Gatekeeper 双击拦截流程。

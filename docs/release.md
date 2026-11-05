@@ -1,7 +1,7 @@
 # 发布与更新
 
-> 状态：`v0.3.1` 为当前发布版本；`v0.3.0` 已走通完整流程——tag 推送 → 双端构建 → 创建 Release，产物可下载。
-> 当前代码已把 macOS 密钥改为本地 `secrets.json`（0600），尚未发版；`v0.3.1` 发布包仍是钥匙串实现。
+> 状态：`v0.3.2` 为当前发布版本；`v0.3.1` 已走通完整流程——tag 推送 → 双端构建 → 创建 Release，产物可下载。
+> `v0.3.2` 起 macOS 密钥保存在本地 `secrets.json`（0600），不再使用钥匙串；`v0.3.1` 及以前为钥匙串实现。
 > 仓库已设为**公开**，应用内的匿名检查更新（`api.github.com/repos/Metahumanz/AItrans/releases/latest`）
 > 才能拿到数据；如果以后改回私有，检查更新会静默失效。
 
@@ -45,7 +45,7 @@ git push origin v2.0.0
 发布工作流里自动编译，本地也可以直接跑：
 
 ```sh
-ISCC.exe /DMyAppVersion=0.3.1 /DSourceDir=..\dist\app windows\installer\AITrans.iss
+ISCC.exe /DMyAppVersion=0.3.2 /DSourceDir=..\dist\app windows\installer\AITrans.iss
 ```
 
 - 默认装到 `%LocalAppData%\Programs\AITrans`，**不需要管理员权限**；
