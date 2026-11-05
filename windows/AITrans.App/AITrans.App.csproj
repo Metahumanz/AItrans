@@ -26,4 +26,19 @@
     <ProjectReference Include="..\AITrans.Core\AITrans.Core.csproj" />
   </ItemGroup>
 
+  <!--
+    dotnet publish 不会把 XAML 编译产物（.xbf 与应用的 .pri）带进发布目录。
+    缺了它们，发布版启动时会在 Microsoft.UI.Xaml.dll 里以 0xC000027B 崩溃，
+    而 bin/ 下的构建产物却正常。这里在发布完成后把它们补进去。
+  -->
+  <Target Name="CopyWinUIXamlResourcesToPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <_WinUIXamlResource Include="$(TargetDir)**\*.xbf" />
+      <_WinUIXamlResource Include="$(TargetDir)$(AssemblyName).pri" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_WinUIXamlResource)"
+          DestinationFiles="@(_WinUIXamlResource->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>

@@ -1,4 +1,4 @@
-# AITrans Windows 自动化验收脚本
+﻿# AITrans Windows 自动化验收脚本
 #
 # 用法（在仓库根目录或任意位置）：
 #   powershell -ExecutionPolicy Bypass -File windows\scripts\verify.ps1
