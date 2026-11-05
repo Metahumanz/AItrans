@@ -97,14 +97,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
-          ASSETS="windows/dist/*.zip windows/dist/*-setup.exe"
+          shopt -s nullglob
+          ASSETS=(windows/dist/*.zip windows/dist/*-setup.exe)
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "没有可上传的产物"
+            exit 1
+          fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release 已存在，补传 Windows 产物"
-            gh release upload "$TAG" $ASSETS --clobber
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
           else
             # 两个平台可能同时创建，失败则退回补传。
-            gh release create "$TAG" $ASSETS \
-              --title "AItrans $TAG" --notes-file release-notes.md \
-              || gh release upload "$TAG" $ASSETS --clobber
+            gh release create "$TAG" "${ASSETS[@]}" \
+              --title "AITrans $TAG" --notes-file release-notes.md \
+              || gh release upload "$TAG" "${ASSETS[@]}" --clobber
           fi
           gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.size)"'
