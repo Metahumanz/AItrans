@@ -199,7 +199,10 @@ final class SettingsStoreTests: XCTestCase {
 
         store.update { $0.autoCheckUpdates = false }
         try store.save(to: path)
-        XCTAssertTrue(try String(contentsOf: path, encoding: .utf8).contains("\"auto_check_updates\": false"))
+        // Foundation 的 prettyPrinted 输出是 `"key" : value`，只断言键名和值。
+        let json = try String(contentsOf: path, encoding: .utf8)
+        XCTAssertTrue(json.contains("\"auto_check_updates\""))
+        XCTAssertTrue(json.contains("false"))
 
         let reloaded = SettingsStore()
         try reloaded.load(from: path)
