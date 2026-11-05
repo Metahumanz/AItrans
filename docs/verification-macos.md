@@ -16,7 +16,7 @@ swift test
 open dist/AITrans.app
 ```
 
-- [x] 测试全绿（当前 53 个，其中 2 个真实接口用例默认跳过）
+- [ ] 测试全绿（当前 56 个，其中 2 个真实接口用例默认跳过；本轮新增的 3 个密钥存储用例待在 Mac 上跑）
 - [x] 打包生成 `macos/dist/AITrans.app` 与 zip
 - [x] 启动后出现主窗口（本机用 `open` 验证，窗口 900×612）
 - [ ] 双击启动后菜单栏显示 AITrans
@@ -107,7 +107,7 @@ open dist/AITrans.app
 
 已验证：
 
-- 本地 `swift test --disable-sandbox`：53 个测试执行，0 失败，2 个跳过。
+- 本地 `swift test --disable-sandbox`：53 个测试执行，0 失败，2 个跳过（2026-11-05 记录；此后新增 3 个密钥存储用例，当前共 56 个，待重跑）。
 - `package-app.sh 0.3.2` 能生成 `AITrans.app`、zip 和 dmg。
 - Release v0.3.2 的 dmg 能挂载：UDZO/UDIF、尾部 `koly`、卷内 `Applications -> /Applications` 软链、App 版本 0.3.2、ad-hoc 签名校验通过。
 - 用真实配置启动 v0.3.2：主窗口 900×612，启动阶段不读密钥，无授权框。
