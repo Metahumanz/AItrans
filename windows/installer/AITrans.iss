@@ -23,6 +23,9 @@
 #define MyAppPublisher "Metahumanz"
 #define MyAppUrl "https://github.com/Metahumanz/AItrans"
 
+; VersionInfoVersion 只接受纯数字点分，0.3.0-rc1 / 0.0.0-ci 这类要砍掉后缀。
+#define MyAppVersionNumeric Copy(MyAppVersion, 1, Pos("-", MyAppVersion) > 0 ? Pos("-", MyAppVersion) - 1 : Len(MyAppVersion))
+
 [Setup]
 ; AppId 一旦发布就不能改，否则新版本会装成第二个程序。
 AppId={{7F3C1A2E-9B4D-4E6A-8C1F-2D5B7A9E0C31}
@@ -33,7 +36,7 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppUrl}
 AppSupportURL={#MyAppUrl}/issues
 AppUpdatesURL={#MyAppUrl}/releases
-VersionInfoVersion={#MyAppVersion}
+VersionInfoVersion={#MyAppVersionNumeric}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
