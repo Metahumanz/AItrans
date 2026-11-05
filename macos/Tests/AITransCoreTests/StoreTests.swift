@@ -187,6 +187,44 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(reloaded.settings.lang, .ja)
         XCTAssertEqual(reloaded.settings.outputMode, .custom)
     }
+
+    func testAutoCheckDefaultsToOnAndRoundTrips() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "aitrans-auto-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let path = dir.appending(path: "settings.json")
+        let store = SettingsStore()
+        XCTAssertTrue(store.settings.autoCheckUpdates)
+
+        store.update { $0.autoCheckUpdates = false }
+        try store.save(to: path)
+        XCTAssertTrue(try String(contentsOf: path, encoding: .utf8).contains("\"auto_check_updates\": false"))
+
+        let reloaded = SettingsStore()
+        try reloaded.load(from: path)
+        XCTAssertFalse(reloaded.settings.autoCheckUpdates)
+    }
+
+    func testMissingAutoCheckKeyKeepsDefault() throws {
+        // 老版本写下的配置里没有 auto_check_updates：不能整份解码失败，也不能丢掉其它字段。
+        let dir = FileManager.default.temporaryDirectory.appending(path: "aitrans-legacy-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let path = dir.appending(path: "settings.json")
+        let legacy = """
+        { "version": 1, "backend": "api", "lang": "zh", "translate": true,
+          "polish": true, "output_mode": "source", "suffix": "_translated" }
+        """
+        try legacy.write(to: path, atomically: true, encoding: .utf8)
+
+        let store = SettingsStore()
+        try store.load(from: path)
+        XCTAssertTrue(store.settings.autoCheckUpdates)
+        XCTAssertTrue(store.settings.translate)
+        XCTAssertEqual(store.settings.suffix, "_translated")
+    }
 }
 
 final class UpdateCheckerTests: XCTestCase {

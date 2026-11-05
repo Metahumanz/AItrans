@@ -147,6 +147,53 @@ public sealed class SettingsStoreTests
             File.Delete(path);
         }
     }
+
+    [Fact]
+    public void AutoCheckDefaultsToOnAndRoundTrips()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "aitrans-settings-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var store = new SettingsStore();
+            Assert.True(store.Settings.AutoCheckUpdates);
+
+            store.Update(settings => settings.AutoCheckUpdates = false);
+            store.Save(path);
+            Assert.Contains("\"auto_check_updates\": false", File.ReadAllText(path));
+
+            var reloaded = new SettingsStore();
+            reloaded.Load(path);
+            Assert.False(reloaded.Settings.AutoCheckUpdates);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void MissingAutoCheckKeyKeepsDefault()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "aitrans-settings-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            // 老版本写下的配置里没有 auto_check_updates，加载时应该回退到默认（开）。
+            File.WriteAllText(
+                path,
+                """
+                { "version": 1, "backend": "api", "lang": "zh", "translate": true,
+                  "polish": true, "output_mode": "source", "suffix": "_translated" }
+                """);
+
+            var store = new SettingsStore();
+            store.Load(path);
+            Assert.True(store.Settings.AutoCheckUpdates);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
 }
 
 public sealed class UpdateCheckerTests
@@ -160,5 +207,79 @@ public sealed class UpdateCheckerTests
     public void ComparesVersions(string candidate, string current, bool expected)
     {
         Assert.Equal(expected, UpdateChecker.IsNewer(candidate, current));
+    }
+
+    private const string ReleaseJson = """
+        {
+          "tag_name": "v9.9.9",
+          "body": "更新说明",
+          "html_url": "https://example.com/release",
+          "assets": [
+            { "name": "AITrans-9.9.9-arm64.zip", "browser_download_url": "https://example.com/a.zip" },
+            { "name": "AITrans-9.9.9-win-x64-setup.exe", "browser_download_url": "https://example.com/a-setup.exe" },
+            { "name": "AITrans-9.9.9-arm64.dmg", "browser_download_url": "https://example.com/a.dmg" }
+          ]
+        }
+        """;
+
+    private static async Task<UpdateInfo?> CheckAsync(string json, params string[] preferred)
+    {
+        using var http = new HttpClient(new StubHandler(json));
+        var checker = new UpdateChecker(http: http)
+        {
+            CurrentVersion = "1.0.0",
+            PreferredExtensions = preferred,
+        };
+        return await checker.CheckAsync();
+    }
+
+    [Fact]
+    public async Task PrefersInstallerOnWindows()
+    {
+        var info = await CheckAsync(ReleaseJson, ".exe");
+        Assert.Equal("9.9.9", info!.Version);
+        Assert.Equal("https://example.com/a-setup.exe", info.DownloadUrl);
+    }
+
+    [Fact]
+    public async Task PrefersDmgOnMac()
+    {
+        var info = await CheckAsync(ReleaseJson, ".dmg");
+        Assert.Equal("https://example.com/a.dmg", info!.DownloadUrl);
+    }
+
+    [Fact]
+    public async Task FallsBackToZipWhenNothingMatches()
+    {
+        var info = await CheckAsync(ReleaseJson, ".msi");
+        Assert.Equal("https://example.com/a.zip", info!.DownloadUrl);
+    }
+
+    [Fact]
+    public async Task ThrowsWhenNoDownloadableAsset()
+    {
+        var json = """{ "tag_name": "v9.9.9", "html_url": "https://example.com/r", "assets": [] }""";
+        await Assert.ThrowsAsync<AITransException>(() => CheckAsync(json, ".exe"));
+    }
+
+    [Fact]
+    public async Task ReturnsNullWhenAlreadyLatest()
+    {
+        var json = """
+            { "tag_name": "v0.9.0", "html_url": "https://example.com/r", "assets": [
+                { "name": "x.zip", "browser_download_url": "https://example.com/x.zip" } ] }
+            """;
+        Assert.Null(await CheckAsync(json, ".zip"));
+    }
+
+    private sealed class StubHandler(string json) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(json),
+            });
     }
 }

@@ -634,8 +634,6 @@
                                     <ToggleSwitch
                                         x:Name="AutoCheckToggle"
                                         Header="启动时自动检查更新"
-                                        OffContent="不自动检查"
-                                        OnContent="自动检查"
                                         Toggled="OnAutoCheckToggled" />
                                     <Button
                                         Click="OnCheckUpdates"
