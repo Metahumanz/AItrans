@@ -1,6 +1,6 @@
 # 发布与更新
 
-> 状态：`v0.3.0` 已走通完整流程——tag 推送 → 双端构建 → 创建 Release，产物可下载。
+> 状态：`v0.3.1` 为当前版本；`v0.3.0` 已走通完整流程——tag 推送 → 双端构建 → 创建 Release，产物可下载。
 > 仓库已设为**公开**，应用内的匿名检查更新（`api.github.com/repos/Metahumanz/AItrans/releases/latest`）
 > 才能拿到数据；如果以后改回私有，检查更新会静默失效。
 
@@ -15,8 +15,8 @@ git push origin v2.0.0
 
 | 工作流 | 平台 | 内容 |
 | --- | --- | --- |
-| `release-macos.yml` | macOS | 跑测试 → 打包 `.app` → 上传 zip |
-| `release-windows.yml` | Windows | 跑测试 → `dotnet publish` → 上传 zip |
+| `release-macos.yml` | macOS | 跑测试 → 打包 `.app` → 上传 dmg/zip |
+| `release-windows.yml` | Windows | 跑测试 → `dotnet publish` → 上传 zip/setup.exe |
 
 两者**互不依赖**：任一平台排队或失败，都不会阻塞另一平台发布。都支持 `workflow_dispatch`
 （传入 tag），可以只重跑单个平台。
@@ -28,10 +28,10 @@ git push origin v2.0.0
 
 | 平台 | 产物 | 说明 |
 | --- | --- | --- |
-| macOS | `AITrans-<version>-arm64.dmg` | 磁盘映像（约 400 KB），打开后把 App 拖进「应用程序」 |
-| macOS | `AITrans-<version>-arm64.zip` | `.app` 压缩包（约 370 KB），解压后拖入「应用程序」 |
+| macOS | `AITrans-<version>-arm64.dmg` | 磁盘映像（约 0.8 MB），打开后把 App 拖进「应用程序」 |
+| macOS | `AITrans-<version>-arm64.zip` | `.app` 压缩包（约 0.5 MB），解压后拖入「应用程序」 |
 | Windows | `AITrans-<version>-win-x64-setup.exe` | 安装包（约 8 MB），默认按当前用户安装，带快捷方式与卸载项 |
-| Windows | `AITrans-<version>-win-x64.zip` | 免安装版：依赖运行时的目录（约 37 MB），解压后运行 `AITrans.exe` |
+| Windows | `AITrans-<version>-win-x64.zip` | 免安装版：依赖运行时的目录（约 10 MB），解压后运行 `AITrans.exe` |
 
 ### macOS dmg
 
@@ -44,7 +44,7 @@ git push origin v2.0.0
 发布工作流里自动编译，本地也可以直接跑：
 
 ```sh
-ISCC.exe /DMyAppVersion=0.3.0 /DSourceDir=..\dist\app windows\installer\AITrans.iss
+ISCC.exe /DMyAppVersion=0.3.1 /DSourceDir=..\dist\app windows\installer\AITrans.iss
 ```
 
 - 默认装到 `%LocalAppData%\Programs\AITrans`，**不需要管理员权限**；

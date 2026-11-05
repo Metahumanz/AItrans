@@ -154,7 +154,7 @@ struct ProviderSheet: View {
         isNew = false
         testMessage = nil
         if let id = selection, let provider = state.providers.first(where: { $0.id == id }) {
-            draft = provider
+            draft = state.providerForEditing(provider)
         }
     }
 

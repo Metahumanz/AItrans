@@ -1,6 +1,6 @@
 # macOS 端验证清单
 
-> 用途：在 Mac 上按此逐项勾选。状态：App 已能构建、打包、启动，但尚未逐项人工验收。
+> 用途：在 Mac 上按此逐项勾选。状态：构建、打包、启动与钥匙串懒加载已在本机验证；其余界面、真实服务和安装包项仍待逐项人工验收。
 
 ## 0. 环境
 
@@ -12,13 +12,14 @@
 ```sh
 cd macos
 swift test
-../macos/Scripts/package-app.sh 0.3.0
+../macos/Scripts/package-app.sh 0.3.1
 open dist/AITrans.app
 ```
 
-- [ ] 测试全绿（当前 40 个）
-- [ ] 打包生成 `macos/dist/AITrans.app` 与 zip
-- [ ] 双击启动后出现主窗口，菜单栏显示 AITrans
+- [x] 测试全绿（当前 46 个，2 个跳过）
+- [x] 打包生成 `macos/dist/AITrans.app` 与 zip
+- [x] 启动后出现主窗口（本机用 `open` 验证，窗口 900×612）
+- [ ] 双击启动后菜单栏显示 AITrans
 - [ ] 首次启动若被 Gatekeeper 拦截，右键「打开」或到「隐私与安全性」放行后可用
 - [ ] 关闭窗口后进程退出（Dock 图标消失）
 
@@ -73,6 +74,8 @@ open dist/AITrans.app
 - [ ] 切换当前提供商后立即生效
 - [ ] 「测试连接」对错误 Key 返回鉴权失败
 - [ ] API Key 存在**钥匙串**里（钥匙串访问.app 搜索 `com.metahumanz.aitrans.provider`），`providers.json` 中无明文
+- [ ] 启动时不读钥匙串；首次开始任务或打开提供商编辑面板时才读取
+- [ ] 升级后首次读取旧条目会弹一次授权框，选「始终允许」后不再重复
 - [ ] 「从旧版导入…」能导入 v1 的 `providers.json`
 
 ## 7. 界面
@@ -81,6 +84,7 @@ open dist/AITrans.app
 - [ ] 窗口缩放时布局不错位（最小 900×560）
 - [ ] 列表滚动流畅（200 条时）
 - [ ] `⌘↩` 开始任务，`⌘⇧U` 检查更新
+- [x] 启动不再因钥匙串授权卡住（懒加载后主窗口先出现）
 - [ ] 启动约 3 秒后自动检查一次；有新版本时文件列顶部出现横幅（不弹 sheet），「查看更新」才弹更新面板
 - [ ] 设置面板「关于」里关掉自动检查后，重启不再自动请求
 - [ ] 菜单「关于 AITrans」可用
@@ -93,7 +97,31 @@ open dist/AITrans.app
 - [ ] 「下载更新」能把 zip 存到「下载」并定位到文件
 - [ ] 「打开下载页」能打开 GitHub Release
 
-## 9. 反馈格式
+## 9. 本次真机验证记录（2026-11-05）
+
+环境：macOS 27.2（26B123），arm64，Swift 6.x。
+
+已验证：
+
+- 本地 `swift test --disable-sandbox`：46 个测试执行，0 失败，2 个跳过。
+- `package-app.sh 0.3.0` 能生成 `AITrans.app`、zip 和 dmg。
+- Release v0.3.0 的 dmg 能挂载；格式为 UDZO/UDIF，尾部有 `koly`，卷内有 `Applications -> /Applications` 软链，App 版本 0.3.0，ad-hoc 签名校验通过。
+- 先用 release dmg 安装并核对：`/Applications/AITrans.app` 的二进制与 release zip 内的 App 完全一致。
+- 随后为验证懒加载，用本地修复构建覆盖了 `/Applications`（当时版本仍显示 0.3.0）；该修复随 v0.3.1 发布。
+- 用真实配置启动修复构建（含旧版 `providers.json` 和钥匙串条目）：主窗口正常出现，尺寸 900×612，启动阶段不再弹钥匙串授权框。
+- 钥匙串读取已改为懒加载：启动只解析 `providers.json`，不访问钥匙串；开始任务、测试连接、打开提供商编辑面板时才按需读取。
+
+本次发现并已处理：
+
+- 修改前，升级后的第一次启动会卡在 `SecurityAgent` 的钥匙串授权框，主窗口要等授权后才出现。原因是旧钥匙串条目的 ACL 只认旧 ad-hoc 签名。
+- 改为懒加载后，启动不再阻塞；旧条目在第一次真正读取时仍会弹一次授权框，选「始终允许」即可。要彻底消除这一次弹窗，需要稳定的 Developer ID 签名，而不是每次构建都换 ad-hoc 签名。
+
+尚未验证：
+
+- 横幅/InfoBar 的视觉外观、开关点击、拖拽、真实翻译与 Gatekeeper 双击拦截流程。
+- `spctl -a` 对当前 ad-hoc 包返回 `rejected`，这是未签名/未公证的预期结果；本机没有 quarantine 属性，所以 `open` 能直接启动。
+
+## 10. 反馈格式
 
 ```text
 项目：5. 引擎与网络

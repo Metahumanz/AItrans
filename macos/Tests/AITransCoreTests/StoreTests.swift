@@ -3,6 +3,26 @@
 import XCTest
 @testable import AITransCore
 
+private final class CountingSecretStore: SecretStoring, @unchecked Sendable {
+    private let inner = MemorySecretStore()
+    private(set) var reads = 0
+    private(set) var writes = 0
+
+    func secret(for id: String) throws -> String? {
+        reads += 1
+        return try inner.secret(for: id)
+    }
+
+    func setSecret(_ value: String, for id: String) throws {
+        writes += 1
+        try inner.setSecret(value, for: id)
+    }
+
+    func deleteSecret(for id: String) throws {
+        try inner.deleteSecret(for: id)
+    }
+}
+
 final class ProviderStoreTests: XCTestCase {
     private var tempDir: URL!
 
@@ -71,10 +91,31 @@ final class ProviderStoreTests: XCTestCase {
         let reloaded = ProviderStore(secrets: secrets)
         try reloaded.load(from: path)
         XCTAssertEqual(reloaded.activeID, "acme")
-        XCTAssertEqual(reloaded.provider(id: "acme")?.apiKey, "sk-secret")
+        XCTAssertEqual(reloaded.provider(id: "acme")?.apiKey, "", "加载阶段不应读钥匙串")
+        let hydrated = try reloaded.hydrate(XCTUnwrap(reloaded.provider(id: "acme")))
+        XCTAssertEqual(hydrated.apiKey, "sk-secret")
     }
 
-    func testLoadMigratesPlaintextKeyIntoKeychain() throws {
+    func testLoadDefersKeychainReadsUntilHydrate() throws {
+        let secrets = CountingSecretStore()
+        let writer = ProviderStore(secrets: secrets)
+        _ = try writer.upsert(sample(id: "acme"), activate: true)
+
+        let path = tempDir.appending(path: "providers.json")
+        try writer.save(to: path)
+        let readsAfterWrite = secrets.reads
+
+        let store = ProviderStore(secrets: secrets)
+        try store.load(from: path)
+        XCTAssertEqual(secrets.reads, readsAfterWrite, "load 不应访问钥匙串")
+        XCTAssertEqual(store.provider(id: "acme")?.apiKey, "")
+
+        let hydrated = try store.hydrate(XCTUnwrap(store.provider(id: "acme")))
+        XCTAssertEqual(hydrated.apiKey, "sk-secret")
+        XCTAssertEqual(secrets.reads, readsAfterWrite + 1)
+    }
+
+    func testSaveMigratesPlaintextKeyIntoKeychain() throws {
         let path = tempDir.appending(path: "providers.json")
         let legacy = """
         {
@@ -92,7 +133,10 @@ final class ProviderStoreTests: XCTestCase {
         try store.load(from: path)
 
         XCTAssertEqual(store.provider(id: "old")?.apiKey, "sk-plain")
-        XCTAssertEqual(try secrets.secret(for: "old"), "sk-plain", "明文 key 应迁移到密钥存储")
+        XCTAssertNil(try secrets.secret(for: "old"), "加载阶段不应写钥匙串")
+
+        try store.save(to: path)
+        XCTAssertEqual(try secrets.secret(for: "old"), "sk-plain", "保存时明文 key 应迁移到钥匙串")
     }
 
     func testDeleteClearsActiveWhenNeeded() throws {

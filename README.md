@@ -33,7 +33,7 @@ AItrans/
 
 ```sh
 # macOS
-cd macos && swift test && ../macos/Scripts/package-app.sh 0.3.0
+cd macos && swift test && ../macos/Scripts/package-app.sh 0.3.1
 # 产物：macos/dist/AITrans.app
 
 # Windows
@@ -51,8 +51,8 @@ Windows 提供两种产物：`AITrans-<version>-win-x64-setup.exe` 安装包（�
 带开始菜单快捷方式和卸载项）与免安装的 zip。安装包本地构建：
 
 ```
-ISCC.exe /DMyAppVersion=0.3.0 windows\installer\AITrans.iss
-# 产物：windows\dist\AITrans-0.3.0-win-x64-setup.exe
+ISCC.exe /DMyAppVersion=0.3.1 windows\installer\AITrans.iss
+# 产物：windows\dist\AITrans-0.3.1-win-x64-setup.exe
 ```
 
 两个客户端都**不做代码签名**，首次打开需要手动放行：

@@ -149,10 +149,18 @@ final class AppState: ObservableObject {
             return
         }
         let usesOllama = settings.backend == .ollama
-        let provider = activeProvider
-        if !usesOllama, provider == nil {
-            alertMessage = "请先在「提供商」里添加并启用一个提供商。"
-            return
+        var provider = activeProvider
+        if !usesOllama {
+            guard let selected = provider else {
+                alertMessage = "请先在「提供商」里添加并启用一个提供商。"
+                return
+            }
+            do {
+                provider = try providerStore.hydrate(selected)
+            } catch {
+                alertMessage = "读取 API Key 失败：\(error.localizedDescription)"
+                return
+            }
         }
 
         let model = usesOllama
@@ -248,6 +256,16 @@ final class AppState: ObservableObject {
 
     // MARK: - 提供商
 
+    /// 编辑前按需补齐密钥；打开提供商面板时才会读钥匙串。
+    func providerForEditing(_ provider: Provider) -> Provider {
+        do {
+            return try providerStore.hydrate(provider)
+        } catch {
+            alertMessage = "读取 API Key 失败：\(error.localizedDescription)"
+            return provider
+        }
+    }
+
     func saveProvider(_ provider: Provider, activate: Bool) {
         do {
             _ = try providerStore.upsert(provider, activate: activate)
@@ -294,15 +312,22 @@ final class AppState: ObservableObject {
 
     /// 用 /models 接口测试连通性。
     func testProvider(_ provider: Provider) async -> String {
-        var base = provider.baseURL
+        let hydrated: Provider
+        do {
+            hydrated = try providerStore.hydrate(provider)
+        } catch {
+            return "读取 API Key 失败：\(error.localizedDescription)"
+        }
+
+        var base = hydrated.baseURL
         while base.hasSuffix("/") { base.removeLast() }
         guard let url = URL(string: "\(base)/models") else { return "接口地址无效" }
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 12
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if !provider.apiKey.isEmpty {
-            request.setValue("Bearer \(provider.apiKey)", forHTTPHeaderField: "Authorization")
+        if !hydrated.apiKey.isEmpty {
+            request.setValue("Bearer \(hydrated.apiKey)", forHTTPHeaderField: "Authorization")
         }
 
         do {

@@ -189,9 +189,28 @@ public final class ProviderStore: @unchecked Sendable {
         providers.first { $0.id == id }
     }
 
+    /// 按需从钥匙串补齐密钥。
+    ///
+    /// 启动时只读 providers.json，不碰钥匙串：旧版本留下的条目 ACL 往往只认旧签名，
+    /// 一启动就读取会让升级后的第一次打开卡在授权框上。真正要发请求或编辑提供商时再调用这里。
+    public func hydrate(_ provider: Provider) throws -> Provider {
+        guard provider.apiKey.isEmpty, !provider.id.isEmpty else { return provider }
+        var hydrated = provider
+        hydrated.apiKey = try secrets.secret(for: provider.id) ?? ""
+        return hydrated
+    }
+
+    /// 按需补齐当前提供商的密钥。
+    public func hydrateActive() throws -> Provider? {
+        guard let activeProvider else { return nil }
+        return try hydrate(activeProvider)
+    }
+
     // MARK: 读写
 
-    /// 读取 providers.json；密钥从钥匙串补齐。
+    /// 读取 providers.json；只解析文件，不访问钥匙串。
+    ///
+    /// 旧文件里的明文 `api_key` 会先留在内存里，等 `hydrate` 或 `save` 时再迁移。
     public func load(from url: URL) throws {
         guard FileManager.default.fileExists(atPath: url.path) else {
             providers = []
@@ -206,7 +225,7 @@ public final class ProviderStore: @unchecked Sendable {
         var loaded: [Provider] = []
         for item in rawProviders {
             guard let id = item["id"] as? String, !id.isEmpty else { continue }
-            var provider = Provider(
+            let provider = Provider(
                 id: id,
                 name: item["name"] as? String ?? id,
                 baseURL: item["base_url"] as? String ?? "",
@@ -214,12 +233,7 @@ public final class ProviderStore: @unchecked Sendable {
                 apiKey: item["api_key"] as? String ?? "",
                 requiresKey: item["requires_key"] as? Bool ?? true
             )
-            // 旧文件里可能有明文 key：优先用文件里的值并迁移到钥匙串。
-            if !provider.apiKey.isEmpty {
-                try? secrets.setSecret(provider.apiKey, for: id)
-            } else {
-                provider.apiKey = (try? secrets.secret(for: id)) ?? ""
-            }
+            // 旧文件里的明文 key 先留在内存里，避免启动时访问钥匙串。
             loaded.append(provider)
         }
         providers = loaded
@@ -230,7 +244,12 @@ public final class ProviderStore: @unchecked Sendable {
     }
 
     /// 保存 providers.json；密钥只进钥匙串。
+    ///
+    /// 旧文件里的明文 key 在这里迁移；启动加载时不碰钥匙串。
     public func save(to url: URL) throws {
+        for provider in providers where !provider.apiKey.isEmpty {
+            try secrets.setSecret(provider.apiKey, for: provider.id)
+        }
         let payload: [String: Any] = [
             "version": 1,
             "active": activeID.map { $0 as Any } ?? NSNull(),
