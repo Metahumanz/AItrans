@@ -65,11 +65,159 @@ public sealed class ProviderStoreTests
             var reloaded = new ProviderStore(secrets);
             reloaded.Load(path);
             Assert.Equal("acme", reloaded.ActiveId);
-            Assert.Equal("sk-secret", reloaded.Find("acme")!.ApiKey);
+            Assert.Equal("", reloaded.Find("acme")!.ApiKey); // 懒加载：载入阶段不读密钥
+            Assert.Equal("sk-secret", reloaded.Hydrate(reloaded.Find("acme")!).ApiKey);
         }
         finally
         {
             File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void LoadDefersSecretReadsUntilHydrate()
+    {
+        var secrets = new CountingSecretStore(new MemorySecretStore());
+        var writer = new ProviderStore(secrets);
+        writer.Upsert(Sample("acme"), activate: true);
+
+        var path = Path.Combine(Path.GetTempPath(), "aitrans-providers-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            writer.Save(path);
+            var readsAfterWrite = secrets.Reads;
+
+            var store = new ProviderStore(secrets);
+            store.Load(path);
+            Assert.Equal(readsAfterWrite, secrets.Reads); // 载入不应访问密钥存储
+            Assert.Equal("", store.Find("acme")!.ApiKey);
+
+            var hydrated = store.Hydrate(store.Find("acme")!);
+            Assert.Equal("sk-secret", hydrated.ApiKey);
+            Assert.Equal(readsAfterWrite + 1, secrets.Reads);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void MigratePlaintextKeysRewritesProvidersFile()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "aitrans-providers-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            File.WriteAllText(path, """
+                {
+                  "version": 1,
+                  "active": "old",
+                  "providers": [
+                    { "id": "old", "name": "旧版", "base_url": "https://api.example.com", "model": "m", "api_key": "sk-plain", "requires_key": true }
+                  ]
+                }
+                """);
+
+            var secrets = new MemorySecretStore();
+            var store = new ProviderStore(secrets);
+            store.Load(path);
+
+            Assert.Equal("sk-plain", store.Find("old")!.ApiKey); // 载入阶段先留在内存
+            Assert.Null(secrets.Get("old"));                     // 但不写存储
+
+            var migrated = store.MigratePlaintextKeys(path);
+
+            Assert.Equal(1, migrated);
+            Assert.Equal("sk-plain", secrets.Get("old"));
+            Assert.Equal("", store.Find("old")!.ApiKey);
+            Assert.Equal(0, store.MigratePlaintextKeys(path));   // 重复调用是空操作
+
+            var json = File.ReadAllText(path);
+            Assert.DoesNotContain("sk-plain", json);
+            // Windows 的 Save 会把 api_key 写成空串（字段仍在，但不含密钥）。
+            Assert.Contains("\"api_key\": \"\"", json);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void ClearKeyRemovesSecretButKeepsProvider()
+    {
+        var secrets = new MemorySecretStore();
+        var store = new ProviderStore(secrets);
+        store.Upsert(Sample("acme"), activate: true);
+
+        store.ClearKey("acme");
+
+        Assert.Null(secrets.Get("acme"));
+        Assert.NotNull(store.Find("acme"));
+        Assert.Equal("", store.Find("acme")!.ApiKey);
+    }
+
+    [Fact]
+    public void MemoryStoreTreatsEmptyAsDelete()
+    {
+        var store = new MemorySecretStore();
+        store.Set("deepseek", "sk-memory");
+        store.Set("deepseek", "");
+        Assert.Null(store.Get("deepseek"));
+    }
+
+    [Fact]
+    public void DpapiStoreTreatsEmptyAsDelete()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "aitrans-secrets-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var store = new DpapiSecretStore(path);
+            store.Set("deepseek", "sk-dpapi");
+            Assert.Equal("sk-dpapi", store.Get("deepseek"));
+
+            store.Set("deepseek", "");
+            Assert.Null(store.Get("deepseek"));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void DpapiStoreSurfacesCorruptFile()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "aitrans-secrets-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            File.WriteAllText(path, "not json");
+            var store = new DpapiSecretStore(path);
+            Assert.Throws<AITransException>(() => store.Get("deepseek"));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void DeleteKeepsProviderWhenSecretDeletionFails()
+    {
+        var secretsPath = Path.Combine(Path.GetTempPath(), "aitrans-secrets-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var store = new ProviderStore(new DpapiSecretStore(secretsPath));
+            store.Upsert(Sample("acme"), activate: true);
+
+            File.WriteAllText(secretsPath, "not json");
+
+            Assert.Throws<AITransException>(() => store.Delete("acme"));
+            Assert.NotNull(store.Find("acme"));
+        }
+        finally
+        {
+            File.Delete(secretsPath);
         }
     }
 

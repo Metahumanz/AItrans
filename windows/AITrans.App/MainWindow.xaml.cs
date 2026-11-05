@@ -27,6 +27,7 @@ public sealed partial class MainWindow : Window
     private bool _running;
     private bool _initializing = true;
     private UpdateInfo? _updateInfo;
+    private string? _startupWarning;
 
     public MainWindow()
     {
@@ -58,9 +59,20 @@ public sealed partial class MainWindow : Window
         {
             _providerStore.Load(AppPaths.ProvidersFile);
         }
-        catch (AITransException)
+        catch (Exception error)
         {
-            // 配置损坏时从空列表开始。
+            // 配置损坏时从空列表开始，但把原因留到窗口显示后再告诉用户。
+            _startupWarning = $"读取提供商配置失败：{error.Message}";
+        }
+
+        try
+        {
+            // 旧版 providers.json 里的明文 key 在载入后立刻迁移，避免只翻译不改配置的用户一直留着明文。
+            _providerStore.MigratePlaintextKeys(AppPaths.ProvidersFile);
+        }
+        catch (Exception error)
+        {
+            _startupWarning ??= $"迁移旧版明文 API Key 失败：{error.Message}";
         }
 
         FileList.ItemsSource = _files;
@@ -77,6 +89,21 @@ public sealed partial class MainWindow : Window
         // 等首帧排好版再放动画，否则窗口还没显示就已经播完了。
         DispatcherQueue.TryEnqueue(() => ShowPage("tasks", animate: true));
         _ = CheckUpdatesQuietlyAsync();
+
+        if (_startupWarning is not null)
+        {
+            DispatcherQueue.TryEnqueue(async () =>
+            {
+                try
+                {
+                    await ShowMessageAsync(_startupWarning);
+                }
+                catch (Exception)
+                {
+                    // 启动阶段弹窗失败不致命。
+                }
+            });
+        }
     }
 
     // ---------------------------------------------------------------- 初始化
@@ -452,7 +479,16 @@ public sealed partial class MainWindow : Window
             }
 
             // 内存里的 key 可能是空的（例如上次保存时留空），先按需从加密存储补齐再判断。
-            provider = _providerStore.Hydrate(provider);
+            try
+            {
+                provider = _providerStore.Hydrate(provider);
+            }
+            catch (Exception error)
+            {
+                await ShowMessageAsync($"读取 API Key 失败：{error.Message}");
+                return;
+            }
+
             if (provider.RequiresKey && string.IsNullOrEmpty(provider.ApiKey))
             {
                 await ShowMessageAsync("该提供商还没有 API Key。密钥保存在本地加密文件，请在「提供商」里填写。");
@@ -607,7 +643,19 @@ public sealed partial class MainWindow : Window
             return;
         }
         StatusLabel.Text = "正在测试连接…";
-        var provider = _providerStore.Hydrate(SelectedProvider.Provider);
+
+        Provider provider;
+        try
+        {
+            provider = _providerStore.Hydrate(SelectedProvider.Provider);
+        }
+        catch (Exception error)
+        {
+            StatusLabel.Text = "测试连接失败";
+            await ShowMessageAsync($"读取 API Key 失败：{error.Message}");
+            return;
+        }
+
         var message = await TestProviderAsync(provider.BaseUrl, provider.ApiKey);
         StatusLabel.Text = message;
         await ShowMessageAsync(message);
@@ -636,9 +684,20 @@ public sealed partial class MainWindow : Window
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
 
-        _providerStore.Delete(SelectedProvider.Provider.Id);
-        _providerStore.Save(AppPaths.ProvidersFile);
-        RefreshProviders();
+        try
+        {
+            _providerStore.Delete(SelectedProvider.Provider.Id);
+            _providerStore.Save(AppPaths.ProvidersFile);
+            RefreshProviders();
+        }
+        catch (AITransException error)
+        {
+            await ShowMessageAsync($"{error.Message}\n\n如果密钥文件已损坏，可手动删除 {AppPaths.SecretsFile} 后重试。");
+        }
+        catch (Exception error)
+        {
+            await ShowMessageAsync(error.Message);
+        }
     }
 
     private async void OnProviderImport(object sender, RoutedEventArgs e)
@@ -667,7 +726,21 @@ public sealed partial class MainWindow : Window
     {
         // 编辑前先补齐密钥：内存里可能是空 key（例如上次保存时留空），从加密存储读回来再填表单，
         // 否则保存时会把这个空值当成「保留」，用户就再也看不到已存的 key 了。
-        var editing = existing is null ? null : _providerStore.Hydrate(existing.Provider).Clone();
+        Provider? editing = null;
+        string? hydrateError = null;
+        if (existing is not null)
+        {
+            try
+            {
+                editing = _providerStore.Hydrate(existing.Provider).Clone();
+            }
+            catch (Exception error)
+            {
+                // 读不到也照常打开表单，让用户能清除或重填，而不是卡死在这里。
+                editing = existing.Provider.Clone();
+                hydrateError = $"读取已保存的 API Key 失败：{error.Message}";
+            }
+        }
 
         // 预设可能不需要 Key（例如本地 Ollama）；编辑已有提供商时沿用原值，不要一律写成 true。
         var requiresKey = editing?.RequiresKey ?? true;
@@ -697,12 +770,28 @@ public sealed partial class MainWindow : Window
             Foreground = UiBrush.Get("TextFillColorSecondaryBrush", Microsoft.UI.Colors.Gray),
             Margin = new Thickness(0, 8, 0, 0),
         };
+        if (hydrateError is not null) testText.Text = hydrateError;
 
         var testButton = new Button { Content = "测试连接" };
         testButton.Click += async (_, _) =>
         {
             testText.Text = "正在测试…";
             testText.Text = await TestProviderAsync(urlBox.Text.Trim(), keyBox.Password);
+        };
+
+        // 清空密钥：真正删除延后到「保存」，取消对话框不会误删。
+        var clearKeyRequested = false;
+        var clearKeyButton = new Button
+        {
+            Content = "清除已保存的密钥",
+            IsEnabled = editing is not null && !string.IsNullOrEmpty(editing.ApiKey),
+        };
+        clearKeyButton.Click += (_, _) =>
+        {
+            clearKeyRequested = true;
+            keyBox.Password = "";
+            clearKeyButton.IsEnabled = false;
+            testText.Text = "保存后会清除已存密钥。";
         };
 
         presetCombo.SelectionChanged += (_, _) =>
@@ -723,6 +812,7 @@ public sealed partial class MainWindow : Window
         content.Children.Add(keyBox);
         content.Children.Add(requiresKeyBox);
         content.Children.Add(testButton);
+        content.Children.Add(clearKeyButton);
         content.Children.Add(testText);
 
         var dialog = new ContentDialog
@@ -748,6 +838,14 @@ public sealed partial class MainWindow : Window
                 ApiKey = keyBox.Password,
                 RequiresKey = requiresKeyBox.IsChecked == true,
             }, activate: true);
+
+            // 点了「清除已保存的密钥」且保存时字段仍为空：删除已存密钥。
+            // 空 key 本身在 Upsert 里表示「保留」，所以清除要单独走这一步。
+            if (clearKeyRequested && editing is not null && string.IsNullOrEmpty(keyBox.Password))
+            {
+                _providerStore.ClearKey(editing.Id);
+            }
+
             _providerStore.Save(AppPaths.ProvidersFile);
             RefreshProviders();
         }

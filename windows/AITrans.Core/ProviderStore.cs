@@ -19,7 +19,18 @@ public sealed class MemorySecretStore : ISecretStore
 
     public string? Get(string id) => _values.TryGetValue(id, out var value) ? value : null;
 
-    public void Set(string id, string value) => _values[id] = value;
+    public void Set(string id, string value)
+    {
+        // 与文件实现保持一致：空值表示删除。
+        if (string.IsNullOrEmpty(value))
+        {
+            _values.Remove(id);
+        }
+        else
+        {
+            _values[id] = value;
+        }
+    }
 
     public void Delete(string id) => _values.Remove(id);
 }
@@ -27,6 +38,7 @@ public sealed class MemorySecretStore : ISecretStore
 /// <summary>
 /// 用 Windows DPAPI 按当前用户加密密钥，落盘为一个不透明文件。
 /// 与 macOS 的本地 secrets.json 对应：密钥不进入 providers.json。
+/// 空值表示删除；文件损坏或解密失败会抛 <see cref="AITransException"/>，不再静默当成「没有密钥」。
 /// </summary>
 public sealed class DpapiSecretStore : ISecretStore
 {
@@ -41,14 +53,25 @@ public sealed class DpapiSecretStore : ISecretStore
     private Dictionary<string, string> Load()
     {
         if (!File.Exists(_path)) return new Dictionary<string, string>();
+
+        string text;
         try
         {
-            return JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(_path))
+            text = File.ReadAllText(_path);
+        }
+        catch (Exception error)
+        {
+            throw new AITransException($"读取密钥文件失败：{_path}（{error.Message}）");
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, string>>(text)
                    ?? new Dictionary<string, string>();
         }
-        catch (Exception)
+        catch (JsonException)
         {
-            return new Dictionary<string, string>();
+            throw new AITransException($"密钥文件格式不正确：{_path}");
         }
     }
 
@@ -68,14 +91,22 @@ public sealed class DpapiSecretStore : ISecretStore
                 Convert.FromBase64String(encoded), Entropy, DataProtectionScope.CurrentUser);
             return Encoding.UTF8.GetString(bytes);
         }
-        catch (Exception)
+        catch (Exception error)
         {
-            return null;
+            throw new AITransException(
+                $"密钥解密失败：{_path}（{error.Message}）。如果换了 Windows 用户或文件已损坏，" +
+                "可在「提供商」里清除后重新填写。");
         }
     }
 
     public void Set(string id, string value)
     {
+        if (string.IsNullOrEmpty(value))
+        {
+            Delete(id);
+            return;
+        }
+
         var values = Load();
         var bytes = ProtectedData.Protect(
             Encoding.UTF8.GetBytes(value), Entropy, DataProtectionScope.CurrentUser);
@@ -237,20 +268,8 @@ public sealed class ProviderStore
         }
         if (file is null) throw new AITransException("providers.json 格式不正确。");
 
-        foreach (var provider in file.Providers)
-        {
-            // Windows 的 DPAPI 不会弹授权框，启动时直接解密并迁移旧明文；
-            // macOS 因钥匙串 ACL 授权框改为按需读取，两端策略不同是有意为之。
-            if (!string.IsNullOrEmpty(provider.ApiKey))
-            {
-                _secrets.Set(provider.Id, provider.ApiKey);
-            }
-            else
-            {
-                provider.ApiKey = _secrets.Get(provider.Id) ?? "";
-            }
-        }
-
+        // 旧文件里的明文 api_key 先留在内存里，由调用方在载入后调用 MigratePlaintextKeys 迁移。
+        // 这里不读密钥存储：启动阶段不碰 secrets.dat，开始任务 / 测试连接 / 编辑时才按需补齐。
         Providers = file.Providers;
         ActiveId = file.Active;
         if (ActiveId is not null && Find(ActiveId) is null)
@@ -280,6 +299,36 @@ public sealed class ProviderStore
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
         File.WriteAllText(path, JsonSerializer.Serialize(file, new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    /// <summary>
+    /// 把旧 providers.json 里的明文 key 迁移到 DPAPI 存储并重写文件，返回迁移条数。
+    /// 应在 <see cref="Load"/> 之后、<see cref="Hydrate"/> 之前调用；只处理内存里带 key 的条目，
+    /// 因此重复调用是安全的。
+    /// </summary>
+    public int MigratePlaintextKeys(string path)
+    {
+        var pending = Providers.Where(provider => !string.IsNullOrEmpty(provider.ApiKey)).ToList();
+        if (pending.Count == 0) return 0;
+
+        foreach (var provider in pending)
+        {
+            _secrets.Set(provider.Id, provider.ApiKey);
+        }
+        foreach (var provider in pending)
+        {
+            provider.ApiKey = "";
+        }
+        Save(path);
+        return pending.Count;
+    }
+
+    /// <summary>清除某个提供商已保存的密钥；提供商本身保留。</summary>
+    public void ClearKey(string id)
+    {
+        _secrets.Delete(id);
+        var provider = Find(id);
+        if (provider is not null) provider.ApiKey = "";
     }
 
     public Provider Upsert(Provider provider, bool activate = false)
@@ -313,8 +362,10 @@ public sealed class ProviderStore
 
     public void Delete(string id)
     {
-        Providers.RemoveAll(provider => provider.Id == id);
+        if (Find(id) is null) return;
+        // 先删密钥：失败时保留提供商，避免留下无法再被清理的孤儿密钥。
         _secrets.Delete(id);
+        Providers.RemoveAll(provider => provider.Id == id);
         if (ActiveId == id)
         {
             ActiveId = Providers.FirstOrDefault()?.Id;
@@ -335,6 +386,13 @@ public sealed class ProviderStore
         if (!string.IsNullOrEmpty(profilesPath) && File.Exists(profilesPath))
         {
             Load(profilesPath);
+            // v1 的 providers.json 里是明文 key：写进加密存储后清掉内存明文，不重写源文件。
+            var plaintext = Providers.Where(provider => !string.IsNullOrEmpty(provider.ApiKey)).ToList();
+            foreach (var provider in plaintext)
+            {
+                _secrets.Set(provider.Id, provider.ApiKey);
+                provider.ApiKey = "";
+            }
             imported = Providers.Count;
         }
 
