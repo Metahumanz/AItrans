@@ -16,7 +16,7 @@ swift test
 open dist/AITrans.app
 ```
 
-- [ ] 测试全绿（当前 56 个，其中 2 个真实接口用例默认跳过；本轮新增的 3 个密钥存储用例待在 Mac 上跑）
+- [x] 测试全绿（当前 56 个，其中 2 个真实接口用例默认跳过；v0.3.3 的 release 工作流已在 macos-15 上跑过）
 - [x] 打包生成 `macos/dist/AITrans.app` 与 zip
 - [x] 启动后出现主窗口（本机用 `open` 验证，窗口 900×612）
 - [ ] 双击启动后菜单栏显示 AITrans
@@ -107,11 +107,12 @@ open dist/AITrans.app
 
 已验证：
 
-- 本地 `swift test --disable-sandbox`：53 个测试执行，0 失败，2 个跳过（2026-11-05 记录；此后新增 3 个密钥存储用例，当前共 56 个，待重跑）。
+- `swift test --disable-sandbox`：56 个测试，2 个跳过，0 失败（v0.3.3 的 Release macOS 工作流在 macos-15 上执行）。
 - `package-app.sh 0.3.2` 能生成 `AITrans.app`、zip 和 dmg。
 - Release v0.3.2 的 dmg 能挂载：UDZO/UDIF、尾部 `koly`、卷内 `Applications -> /Applications` 软链、App 版本 0.3.2、ad-hoc 签名校验通过。
 - 用真实配置启动 v0.3.2：主窗口 900×612，启动阶段不读密钥，无授权框。
 - v0.3.2 起 macOS 密钥保存在本地 `secrets.json`（明文，0600）：正常启动只解析 `providers.json`；检测到旧版明文 key 时会在载入后立即迁移；开始任务、测试连接、打开提供商编辑面板时才按需读取。
+- v0.3.3：读取密钥不再创建目录或锁文件，新增「清除已保存的密钥」；Release 已发布 dmg（约 0.8 MB）与 zip（约 0.45 MB）。
 
 已知限制：
 
