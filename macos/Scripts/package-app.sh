@@ -55,7 +55,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleName</key>
     <string>AITrans</string>
     <key>CFBundleDisplayName</key>
-    <string>AItrans</string>
+    <string>AITrans</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

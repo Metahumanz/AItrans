@@ -16,8 +16,8 @@ swift test
 open dist/AITrans.app
 ```
 
-- [x] 测试全绿（当前 56 个，其中 2 个真实接口用例默认跳过；v0.3.3 的 release 工作流已在 macos-15 上跑过）
-- [x] 打包生成 `macos/dist/AITrans.app` 与 zip
+- [x] 测试全绿（当前 60 个，其中 2 个真实接口用例默认跳过；v0.3.3 的 release 工作流已在 macos-15 上跑过）
+- [x] 打包生成 `macos/dist/AITrans.app`、zip 与 dmg
 - [x] 启动后出现主窗口（本机用 `open` 验证，窗口 900×612）
 - [ ] 双击启动后菜单栏显示 AITrans
 - [ ] 首次启动若被 Gatekeeper 拦截，右键「打开」或到「隐私与安全性」放行后可用
@@ -76,8 +76,9 @@ open dist/AITrans.app
 - [x] API Key 保存在 `~/Library/Application Support/AITrans/secrets.json`（0600），`providers.json` 中无明文
 - [x] 正常启动不读 `secrets.json`；首次开始任务、测试连接或打开提供商编辑面板时才读取。若检测到旧版明文 key，启动阶段会读写一次以完成迁移
 - [x] 读取密钥不会创建目录或 `secrets.json.lock`（只有写入才加锁）
-- [x] 删除提供商时对应 key 从 `secrets.json` 移除
-- [x] 「清除已保存的密钥」能删掉条目但保留提供商；`providers.json` 不变
+- [x] 删除提供商时对应 key 从 `secrets.json` 移除（删除前有确认框）
+- [x] 「清除已保存的密钥」能删掉条目但保留提供商；`providers.json` 不变（清除前有确认框）
+- [ ] 公网 `http://` 接口保存时被拒绝并提示改用 https；`localhost` / 局域网 `http://` 可正常保存
 - [ ] 旧钥匙串条目不参与读取；升级后需要重新填写一次 API Key
 - [ ] 「从旧版导入…」能导入 v1 的 `providers.json`
 - [ ] `secrets.json` 损坏时删除提供商失败，提示里给出文件路径和手工处理方式
@@ -107,18 +108,21 @@ open dist/AITrans.app
 
 已验证：
 
-- `swift test --disable-sandbox`：56 个测试，2 个跳过，0 失败（v0.3.3 的 Release macOS 工作流在 macos-15 上执行）。
+- `swift test --disable-sandbox`：60 个测试，2 个跳过，0 失败（2026-11-05 本机重跑；v0.3.3 的 Release macOS 工作流在 macos-15 上执行）。
 - `package-app.sh 0.3.2` 能生成 `AITrans.app`、zip 和 dmg。
+- `package-app.sh 0.3.3` 能生成 app / zip / dmg；本地 dmg 可挂载、版本 0.3.3、卷内 `Applications` 软链与 ad-hoc 签名校验通过（2026-11-05）。
 - Release v0.3.2 的 dmg 能挂载：UDZO/UDIF、尾部 `koly`、卷内 `Applications -> /Applications` 软链、App 版本 0.3.2、ad-hoc 签名校验通过。
 - 用真实配置启动 v0.3.2：主窗口 900×612，启动阶段不读密钥，无授权框。
 - v0.3.2 起 macOS 密钥保存在本地 `secrets.json`（明文，0600）：正常启动只解析 `providers.json`；检测到旧版明文 key 时会在载入后立即迁移；开始任务、测试连接、打开提供商编辑面板时才按需读取。
 - v0.3.3：读取密钥不再创建目录或锁文件，新增「清除已保存的密钥」；Release 已发布 dmg（约 0.8 MB）与 zip（约 0.45 MB）。
+- 后续修复：删除提供商 / 清除密钥前增加确认；公网 `http://` 提供商保存时拒绝并提示改用 https；显示名统一为 `AITrans`；清理 `ContentView` 的未使用变量警告。
 
 已知限制：
 
 - `v0.3.1` 及以前使用钥匙串；`v0.3.2` 起使用本地 `secrets.json`。
 - 旧钥匙串条目不自动迁移；升级到本地文件版本后，需要在提供商里重新填写一次 API Key。
 - `secrets.json` 是明文 0600，不再有 Keychain ACL 保护；这是脱离钥匙串的取舍。
+- macOS ATS 只放行本机/局域网明文 HTTP；公网 `http://` 提供商在保存时会被拒绝，需改用 `https://`（Windows 无此限制）。
 - 尚未验证：横幅/InfoBar 视觉、开关点击、拖拽、真实翻译与 Gatekeeper 双击拦截流程。
 - `spctl -a` 对 ad-hoc 包返回 `rejected`，这是未签名/未公证的预期结果；本机没有 quarantine 属性，所以 `open` 能直接启动。
 

@@ -178,6 +178,8 @@ public struct ChatClient: ChatCompleting {
             case NSURLErrorNotConnectedToInternet: return "网络错误：没有网络连接"
             case NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost:
                 return "网络错误：无法连接服务器"
+            case NSURLErrorAppTransportSecurityRequiresSecureConnection:
+                return "网络错误：macOS 不允许明文 HTTP，请把接口地址改为 https://（本机或局域网地址除外）"
             default: return "网络错误：\(ns.localizedDescription)"
             }
         }

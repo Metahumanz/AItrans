@@ -175,6 +175,37 @@ public enum ProviderValidation {
         return candidate
     }
 
+    /// macOS 的 App Transport Security 只放行本机与局域网明文 HTTP；
+    /// 公网 `http://` 会被系统直接拦截，因此保存时就拒绝，避免用户到发请求时才看到英文 ATS 报错。
+    static func allowsCleartextHTTP(host: String) -> Bool {
+        let host = host.lowercased()
+        if host == "localhost" || host == "::1" || host == "[::1]" { return true }
+        if host.hasSuffix(".local") { return true }
+        // 不带点的主机名按本地网络处理（ATS 的 NSAllowsLocalNetworking 行为）。
+        if !host.contains("."), !host.contains(":") { return true }
+
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
+        if parts.count == 4 {
+            let octets = parts.compactMap { Int($0) }
+            if octets.count == 4, octets.allSatisfy({ (0...255).contains($0) }) {
+                switch (octets[0], octets[1]) {
+                case (127, _), (10, _), (192, 168), (172, 16...31), (169, 254):
+                    return true
+                default:
+                    return false
+                }
+            }
+        }
+
+        // IPv6 ULA（fc00::/7）与 link-local（fe80::/10）。
+        if host.contains(":") {
+            return host.hasPrefix("fc") || host.hasPrefix("fd")
+                || host.hasPrefix("fe8") || host.hasPrefix("fe9")
+                || host.hasPrefix("fea") || host.hasPrefix("feb")
+        }
+        return false
+    }
+
     public static func normalize(_ provider: Provider, taken: Set<String>) throws -> Provider {
         let name = provider.name.trimmingCharacters(in: .whitespacesAndNewlines)
         var baseURL = provider.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -196,6 +227,9 @@ public enum ProviderValidation {
               url.host?.isEmpty == false
         else {
             throw AITransError("接口地址必须以 http:// 或 https:// 开头。")
+        }
+        if scheme == "http", let host = url.host, !allowsCleartextHTTP(host: host) {
+            throw AITransError("公网地址请使用 https://（macOS 会拦截公网明文 HTTP；本机或局域网地址仍可用 http）。")
         }
         guard baseURL.count <= 500 else { throw AITransError("接口地址过长。") }
         guard !model.isEmpty else { throw AITransError("请填写模型名称。") }

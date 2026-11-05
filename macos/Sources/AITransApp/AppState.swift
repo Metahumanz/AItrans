@@ -294,15 +294,18 @@ final class AppState: ObservableObject {
         }
     }
 
-    func deleteProvider(id: String) {
+    @discardableResult
+    func deleteProvider(id: String) -> Bool {
         do {
             try providerStore.delete(id: id)
             try providerStore.save(to: AppPaths.providersFile)
             providers = providerStore.providers
             activeProviderID = providerStore.activeID
+            return true
         } catch {
             alertMessage = "删除提供商失败：\(error.localizedDescription)\n"
                 + "如果密钥文件已损坏，可手动删除 \(AppPaths.secretsFile.path) 后重试。"
+            return false
         }
     }
 
@@ -372,6 +375,10 @@ final class AppState: ObservableObject {
             let body = String(decoding: data.prefix(160), as: UTF8.self)
             return "HTTP \(status)\(body.isEmpty ? "" : "：\(body)")"
         } catch {
+            let ns = error as NSError
+            if ns.domain == NSURLErrorDomain, ns.code == NSURLErrorAppTransportSecurityRequiresSecureConnection {
+                return "macOS 不允许公网明文 HTTP，请把接口地址改为 https://（本机或局域网地址除外）"
+            }
             return "连接失败：\(error.localizedDescription)"
         }
     }

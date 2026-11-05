@@ -59,6 +59,43 @@ final class ProviderStoreTests: XCTestCase {
         XCTAssertThrowsError(try ProviderValidation.normalize(broken, taken: []))
     }
 
+    func testRejectsPublicCleartextHTTP() {
+        var broken = sample()
+        broken.baseURL = "http://api.example.com/v1"
+        XCTAssertThrowsError(try ProviderValidation.normalize(broken, taken: [])) { error in
+            XCTAssertTrue(
+                error.localizedDescription.contains("https"),
+                "公网 http 应提示改用 https：\(error.localizedDescription)"
+            )
+        }
+    }
+
+    func testAllowsLocalCleartextHTTP() {
+        let bases = [
+            "http://localhost:11434/v1",
+            "http://127.0.0.1:11434",
+            "http://192.168.1.10:8080/v1",
+            "http://10.0.0.5:1234",
+            "http://172.16.0.2:1234",
+            "http://172.31.255.254:1234",
+            "http://169.254.1.1:1234",
+            "http://[::1]:11434",
+            "http://nas.local:8080/v1",
+            "http://my-nas:8080/v1",
+        ]
+        for base in bases {
+            var provider = sample()
+            provider.baseURL = base
+            XCTAssertNoThrow(try ProviderValidation.normalize(provider, taken: []), base)
+        }
+    }
+
+    func testRejectsCleartextHTTPOutsidePrivateRanges() {
+        var broken = sample()
+        broken.baseURL = "http://172.32.0.1:1234"
+        XCTAssertThrowsError(try ProviderValidation.normalize(broken, taken: []))
+    }
+
     func testRejectsEmptyName() {
         var broken = sample()
         broken.name = "   "

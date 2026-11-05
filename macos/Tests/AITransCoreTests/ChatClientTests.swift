@@ -121,4 +121,14 @@ final class ChatClientTests: XCTestCase {
         let body = Data(#"{"error":{"message":"invalid key"}}"#.utf8)
         XCTAssertEqual(ChatClient.errorMessage(from: body, status: 401), "HTTP 401: invalid key")
     }
+
+    func testTransportMessageExplainsATS() {
+        let error = NSError(
+            domain: NSURLErrorDomain,
+            code: NSURLErrorAppTransportSecurityRequiresSecureConnection
+        )
+        let message = ChatClient.transportMessage(error)
+        XCTAssertTrue(message.contains("https"), "应提示改用 https：\(message)")
+        XCTAssertTrue(message.contains("明文 HTTP"), "应说明是明文 HTTP 被拦截：\(message)")
+    }
 }

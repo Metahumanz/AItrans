@@ -13,6 +13,8 @@ struct ProviderSheet: View {
     @State private var testMessage: String?
     @State private var isTesting = false
     @State private var showLegacyImporter = false
+    @State private var pendingDeletion: Provider?
+    @State private var pendingClear: Provider?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -48,6 +50,46 @@ struct ProviderSheet: View {
             }
         }
         .onAppear(perform: syncSelection)
+        .confirmationDialog(
+            "删除提供商？",
+            isPresented: deleteConfirmation,
+            titleVisibility: .visible,
+            presenting: pendingDeletion
+        ) { provider in
+            Button("删除「\(provider.name)」", role: .destructive) {
+                performDelete(provider)
+            }
+            Button("取消", role: .cancel) {}
+        } message: { _ in
+            Text("该提供商的 API Key 会一并从本地密钥文件移除，且无法撤销。")
+        }
+        .confirmationDialog(
+            "清除已保存的密钥？",
+            isPresented: clearConfirmation,
+            titleVisibility: .visible,
+            presenting: pendingClear
+        ) { provider in
+            Button("清除密钥", role: .destructive) {
+                performClearKey(provider)
+            }
+            Button("取消", role: .cancel) {}
+        } message: { provider in
+            Text("只会删除「\(provider.name)」保存在本地的 API Key，提供商配置保留；需要重新填写 Key 才能继续使用。")
+        }
+    }
+
+    private var deleteConfirmation: Binding<Bool> {
+        Binding(
+            get: { pendingDeletion != nil },
+            set: { if !$0 { pendingDeletion = nil } }
+        )
+    }
+
+    private var clearConfirmation: Binding<Bool> {
+        Binding(
+            get: { pendingClear != nil },
+            set: { if !$0 { pendingClear = nil } }
+        )
     }
 
     private var sidebar: some View {
@@ -198,8 +240,14 @@ struct ProviderSheet: View {
     }
 
     private func deleteSelected() {
-        guard let id = selection else { return }
-        state.deleteProvider(id: id)
+        guard let id = selection,
+              let provider = state.providers.first(where: { $0.id == id }) else { return }
+        pendingDeletion = provider
+    }
+
+    private func performDelete(_ provider: Provider) {
+        pendingDeletion = nil
+        guard state.deleteProvider(id: provider.id) else { return }
         selection = state.activeProviderID ?? state.providers.first?.id
         if selection == nil { startNew() } else { loadDraft() }
     }
@@ -218,8 +266,14 @@ struct ProviderSheet: View {
 
     /// 显式清除已保存的密钥。`save()` 里空 key 表示“保留”，所以清空必须走这里。
     private func clearKey() {
-        guard let id = selection else { return }
-        guard state.clearProviderKey(id: id) else { return }
+        guard let id = selection,
+              let provider = state.providers.first(where: { $0.id == id }) else { return }
+        pendingClear = provider
+    }
+
+    private func performClearKey(_ provider: Provider) {
+        pendingClear = nil
+        guard state.clearProviderKey(id: provider.id) else { return }
         draft.apiKey = ""
         testMessage = "已清除保存的密钥。"
     }

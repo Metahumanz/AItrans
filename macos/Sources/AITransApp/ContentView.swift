@@ -362,7 +362,7 @@ private struct FileRow: View {
                     .lineLimit(1)
             }
             Spacer()
-            if let output = result?.outputPath {
+            if result?.outputPath != nil {
                 Button("显示", action: reveal)
                     .buttonStyle(.link)
                     .font(.caption)
