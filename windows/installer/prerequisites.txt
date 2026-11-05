@@ -1,0 +1,19 @@
+﻿安装前请确认这台电脑已经装好两个运行时。
+安装包里不含它们（AITrans 是依赖运行时发布的）。
+
+1. .NET 10 桌面运行时（Microsoft.WindowsDesktop.App 10.x）
+   https://dotnet.microsoft.com/download/dotnet/10.0
+
+2. Windows App Runtime 1.8
+   https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads
+
+缺任何一个，AITrans 启动时会弹窗说明缺少哪个运行时，不会静默闪退。
+装好运行时后重新打开即可。
+
+其他说明
+
+- 安装包未做代码签名，首次运行可能出现 SmartScreen 提示：
+  点「更多信息」→「仍要运行」。
+- 默认安装到当前用户目录（%LocalAppData%\Programs\AITrans），不需要管理员权限。
+  如果勾选「为所有用户安装」，则需要管理员权限。
+- 配置、提供商与 API Key 保存在 %AppData%\AITrans，卸载时不会删除。

@@ -112,6 +112,18 @@ Passed!  - Failed:     0, Passed:    50+, Skipped:     0, Total:    50+
 - [ ] 「检查更新」能读到 GitHub 最新 release
 - [ ] 「打开输出目录」能打开资源管理器
 
+### 安装包
+
+用 `ISCC.exe /DMyAppVersion=0.2.0 windows\installer\AITrans.iss` 生成 `windows\dist\AITrans-0.2.0-win-x64-setup.exe`：
+
+- [ ] 向导为简体中文，首个对话框可选「仅为我安装 / 为所有用户安装」
+- [ ] 「准备安装」页列出两个运行时依赖与下载链接
+- [ ] 默认安装到 `%LocalAppData%\Programs\AITrans`，不需要 UAC
+- [ ] 开始菜单出现 AITrans，勾选任务时桌面也有图标
+- [ ] 从安装目录启动正常，卸载后目录、快捷方式、卸载项都被清掉
+- [ ] 卸载后 `%APPDATA%\AITrans` 仍在（配置不丢）
+- [ ] 覆盖安装新版本时，正在运行的 AITrans 会被提示关闭
+
 ## 三、反馈格式
 
 ```text

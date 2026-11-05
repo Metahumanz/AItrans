@@ -27,7 +27,26 @@ git push origin v2.0.0
 | 平台 | 产物 | 说明 |
 | --- | --- | --- |
 | macOS | `AITrans-<version>-arm64.zip` | `.app` 压缩包（约 370 KB），解压后拖入「应用程序」 |
-| Windows | `AITrans-<version>-win-x64.zip` | 依赖运行时的目录（约 37 MB），解压后运行 `AITrans.exe` |
+| Windows | `AITrans-<version>-win-x64-setup.exe` | 安装包（约 8 MB），默认按当前用户安装，带快捷方式与卸载项 |
+| Windows | `AITrans-<version>-win-x64.zip` | 免安装版：依赖运行时的目录（约 37 MB），解压后运行 `AITrans.exe` |
+
+### Windows 安装包
+
+用 Inno Setup 6 构建（[windows/installer/AITrans.iss](../windows/installer/AITrans.iss)），
+发布工作流里自动编译，本地也可以直接跑：
+
+```sh
+ISCC.exe /DMyAppVersion=0.2.0 /DSourceDir=..\dist\app windows\installer\AITrans.iss
+```
+
+- 默认装到 `%LocalAppData%\Programs\AITrans`，**不需要管理员权限**；
+  向导里可以改成「为所有用户安装」（那时才需要提权，装到 Program Files）；
+- 创建开始菜单快捷方式，桌面图标是可选项；卸载走「应用和功能」，会删掉安装目录，
+  但**保留** `%AppData%\AITrans` 里的配置、提供商与 API Key；
+- 升级直接覆盖安装，`CloseApplications=yes` 会先关掉正在运行的 AITrans；
+- 安装向导的「准备安装」页会先列出两个运行时依赖和下载地址（安装包不含运行时）。
+
+安装包同样**未签名**，SmartScreen 仍会拦一次。
 
 Windows 包**不带** .NET 运行时和 Windows App SDK 运行时，使用前需要装好：
 

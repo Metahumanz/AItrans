@@ -47,6 +47,14 @@ Windows 客户端是原生 WinUI 3（`NavigationView` + Mica + 自绘标题栏�
 （约 37 MB）：目标机器需要 .NET 10 桌面运行时与 Windows App Runtime 1.8，详见
 [docs/release.md](docs/release.md)。
 
+Windows 提供两种产物：`AITrans-<version>-win-x64-setup.exe` 安装包（约 8 MB，默认装到当前用户目录，
+带开始菜单快捷方式和卸载项）与免安装的 zip。安装包本地构建：
+
+```
+ISCC.exe /DMyAppVersion=0.2.0 windows\installer\AITrans.iss
+# 产物：windows\dist\AITrans-0.2.0-win-x64-setup.exe
+```
+
 两个客户端都**不做代码签名**，首次打开需要手动放行：
 
 - macOS：右键点 App →「打开」；或系统设置 → 隐私与安全性 →「仍要打开」；
