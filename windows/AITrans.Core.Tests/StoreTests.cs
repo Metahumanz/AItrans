@@ -74,6 +74,51 @@ public sealed class ProviderStoreTests
     }
 
     [Fact]
+    public void UpsertWithoutKeyKeepsExistingSecret()
+    {
+        var secrets = new MemorySecretStore();
+        var store = new ProviderStore(secrets);
+        store.Upsert(Sample("acme"), activate: true);
+
+        var cleared = Sample("acme");
+        cleared.ApiKey = "";
+        store.Upsert(cleared);
+
+        Assert.Equal("sk-secret", secrets.Get("acme"));
+        Assert.Equal("", store.Find("acme")!.ApiKey);
+    }
+
+    [Fact]
+    public void HydrateRestoresKeyLeftEmptyInMemory()
+    {
+        var secrets = new MemorySecretStore();
+        var store = new ProviderStore(secrets);
+        store.Upsert(Sample("acme"), activate: true);
+
+        var cleared = Sample("acme");
+        cleared.ApiKey = "";
+        store.Upsert(cleared);
+
+        var hydrated = store.Hydrate(store.Find("acme")!);
+
+        Assert.Equal("sk-secret", hydrated.ApiKey);
+        Assert.Equal("", store.Find("acme")!.ApiKey); // 补齐只返回副本，不改列表条目
+    }
+
+    [Fact]
+    public void HydrateSkipsSecretStoreWhenKeyAlreadyLoaded()
+    {
+        var secrets = new CountingSecretStore(new MemorySecretStore());
+        var store = new ProviderStore(secrets);
+        store.Upsert(Sample("acme"), activate: true);
+
+        var hydrated = store.Hydrate(store.Find("acme")!);
+
+        Assert.Equal("sk-secret", hydrated.ApiKey);
+        Assert.Equal(0, secrets.Reads);
+    }
+
+    [Fact]
     public void ImportsLegacyEnvFile()
     {
         var envPath = Path.Combine(Path.GetTempPath(), "aitrans-env-" + Guid.NewGuid().ToString("N"));
@@ -99,6 +144,26 @@ public sealed class ProviderStoreTests
         {
             File.Delete(envPath);
         }
+    }
+
+    /// <summary>统计读次数，用来断言 Hydrate 不会多余地碰密钥存储。</summary>
+    private sealed class CountingSecretStore : ISecretStore
+    {
+        private readonly ISecretStore _inner;
+
+        public CountingSecretStore(ISecretStore inner) => _inner = inner;
+
+        public int Reads { get; private set; }
+
+        public string? Get(string id)
+        {
+            Reads++;
+            return _inner.Get(id);
+        }
+
+        public void Set(string id, string value) => _inner.Set(id, value);
+
+        public void Delete(string id) => _inner.Delete(id);
     }
 }
 

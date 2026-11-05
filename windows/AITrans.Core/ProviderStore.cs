@@ -189,6 +189,22 @@ public sealed class ProviderStore
 
     public Provider? Find(string id) => Providers.FirstOrDefault(provider => provider.Id == id);
 
+    /// <summary>
+    /// 按需从加密存储补齐密钥，与 macOS 的 <c>ProviderStore.hydrate</c> 对应。
+    /// 内存里已有 key 时原样返回，不额外访问密钥存储；需要补齐时返回副本，不改动列表里的条目。
+    /// </summary>
+    public Provider Hydrate(Provider provider)
+    {
+        if (!string.IsNullOrEmpty(provider.ApiKey) || string.IsNullOrEmpty(provider.Id))
+        {
+            return provider;
+        }
+
+        var hydrated = provider.Clone();
+        hydrated.ApiKey = _secrets.Get(provider.Id) ?? "";
+        return hydrated;
+    }
+
     private sealed class StoreFile
     {
         [System.Text.Json.Serialization.JsonPropertyName("version")]
@@ -271,6 +287,13 @@ public sealed class ProviderStore
         var taken = Providers.Where(existing => existing.Id != provider.Id).Select(existing => existing.Id).ToHashSet();
         var normalized = ProviderValidation.Normalize(provider, taken);
 
+        // 空 key 表示「保留已有密钥」，不拿空值覆盖加密存储里的旧值。
+        // 旧值仍留在 secrets.dat 里，下次 Hydrate 时再读回来。
+        if (!string.IsNullOrEmpty(normalized.ApiKey))
+        {
+            _secrets.Set(normalized.Id, normalized.ApiKey);
+        }
+
         var index = Providers.FindIndex(existing => existing.Id == normalized.Id);
         if (index >= 0)
         {
@@ -280,7 +303,6 @@ public sealed class ProviderStore
         {
             Providers.Add(normalized);
         }
-        _secrets.Set(normalized.Id, normalized.ApiKey);
 
         if (activate || ActiveId is null)
         {
