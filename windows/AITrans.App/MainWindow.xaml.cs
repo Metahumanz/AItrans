@@ -6,6 +6,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics;
 using Windows.Storage;
@@ -71,6 +72,9 @@ public sealed partial class MainWindow : Window
         VersionText.Text = $"版本 {GetVersion()}";
         Closed += (_, _) => SaveSettings();
         _initializing = false;
+
+        // 等首帧排好版再放动画，否则窗口还没显示就已经播完了。
+        DispatcherQueue.TryEnqueue(() => ShowPage("tasks", animate: true));
     }
 
     // ---------------------------------------------------------------- 初始化
@@ -171,10 +175,105 @@ public sealed partial class MainWindow : Window
 
     private void OnNavSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        var tag = (args.SelectedItemContainer as NavigationViewItem)?.Tag as string;
+        if (_initializing) return;
+        var tag = (args.SelectedItemContainer as NavigationViewItem)?.Tag as string ?? "tasks";
+        ShowPage(tag, animate: true);
+    }
+
+    private void ShowPage(string tag, bool animate)
+    {
         TasksPanel.Visibility = tag == "tasks" ? Visibility.Visible : Visibility.Collapsed;
         ProvidersPanel.Visibility = tag == "providers" ? Visibility.Visible : Visibility.Collapsed;
         AboutPanel.Visibility = tag == "about" ? Visibility.Visible : Visibility.Collapsed;
+
+        if (!animate) return;
+
+        switch (tag)
+        {
+            case "providers":
+                AnimateIn(ProvidersHeader, ProviderActions, ProvidersCard);
+                break;
+            case "about":
+                AnimateIn(AboutHeader, AboutCards);
+                break;
+            default:
+                AnimateIn(TasksHeader, FilesCard, TranslateCard, OutputCard, ConcurrencyCard, TasksFooter);
+                break;
+        }
+    }
+
+    // ---------------------------------------------------------------- 动效
+
+    private static readonly TimeSpan PageAnimationDuration = TimeSpan.FromMilliseconds(180);
+
+    /// <summary>让一组元素依次淡入并轻微上移，形成瀑布感。</summary>
+    private static void AnimateIn(params FrameworkElement[] elements)
+    {
+        for (var index = 0; index < elements.Length; index++)
+        {
+            AnimateIn(elements[index], index * 35);
+        }
+    }
+
+    private static void AnimateIn(FrameworkElement element, int delayMs)
+    {
+        if (element is null) return;
+
+        if (element.RenderTransform is not CompositeTransform transform)
+        {
+            transform = new CompositeTransform();
+            element.RenderTransform = transform;
+        }
+
+        element.Opacity = 0;
+        transform.TranslateY = 16;
+
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        var begin = TimeSpan.FromMilliseconds(delayMs);
+
+        var fade = new DoubleAnimation
+        {
+            To = 1,
+            Duration = new Duration(PageAnimationDuration),
+            BeginTime = begin,
+            EasingFunction = ease,
+        };
+        Storyboard.SetTarget(fade, element);
+        Storyboard.SetTargetProperty(fade, "Opacity");
+
+        var slide = new DoubleAnimation
+        {
+            To = 0,
+            Duration = new Duration(PageAnimationDuration),
+            BeginTime = begin,
+            EasingFunction = ease,
+        };
+        Storyboard.SetTarget(slide, transform);
+        Storyboard.SetTargetProperty(slide, "TranslateY");
+
+        var storyboard = new Storyboard();
+        storyboard.Children.Add(fade);
+        storyboard.Children.Add(slide);
+        storyboard.Begin();
+    }
+
+    /// <summary>空状态出现时淡入，避免突然蹦出来。</summary>
+    private static void FadeIn(UIElement element)
+    {
+        element.Opacity = 0;
+
+        var fade = new DoubleAnimation
+        {
+            To = 1,
+            Duration = new Duration(TimeSpan.FromMilliseconds(160)),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        };
+        Storyboard.SetTarget(fade, element);
+        Storyboard.SetTargetProperty(fade, "Opacity");
+
+        var storyboard = new Storyboard();
+        storyboard.Children.Add(fade);
+        storyboard.Begin();
     }
 
     // ---------------------------------------------------------------- 文件
@@ -198,7 +297,9 @@ public sealed partial class MainWindow : Window
 
     private void RefreshFiles()
     {
-        EmptyState.Visibility = _files.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        var empty = _files.Count == 0;
+        EmptyState.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
+        if (empty) FadeIn(EmptyState);
         if (_running) return;
         StatusLabel.Text = _files.Count == 0
             ? "拖入 .srt 文件或文件夹开始"
@@ -446,6 +547,7 @@ public sealed partial class MainWindow : Window
             _providers.Add(new ProviderItem(provider, provider.Id == _providerStore.ActiveId));
         }
         ProviderEmptyState.Visibility = _providers.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (_providers.Count == 0) FadeIn(ProviderEmptyState);
     }
 
     private ProviderItem? SelectedProvider =>
