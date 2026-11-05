@@ -443,10 +443,21 @@ public sealed partial class MainWindow : Window
         var usesOllama = settings.Backend == Engine.ollama;
 
         var provider = _providerStore.ActiveProvider;
-        if (!usesOllama && provider is null)
+        if (!usesOllama)
         {
-            await ShowMessageAsync("请先在「提供商」里添加并启用一个提供商。");
-            return;
+            if (provider is null)
+            {
+                await ShowMessageAsync("请先在「提供商」里添加并启用一个提供商。");
+                return;
+            }
+
+            // 内存里的 key 可能是空的（例如上次保存时留空），先按需从加密存储补齐再判断。
+            provider = _providerStore.Hydrate(provider);
+            if (provider.RequiresKey && string.IsNullOrEmpty(provider.ApiKey))
+            {
+                await ShowMessageAsync("该提供商还没有 API Key。密钥保存在本地加密文件，请在「提供商」里填写。");
+                return;
+            }
         }
 
         var model = usesOllama
@@ -596,7 +607,8 @@ public sealed partial class MainWindow : Window
             return;
         }
         StatusLabel.Text = "正在测试连接…";
-        var message = await TestProviderAsync(SelectedProvider.Provider.BaseUrl, SelectedProvider.Provider.ApiKey);
+        var provider = _providerStore.Hydrate(SelectedProvider.Provider);
+        var message = await TestProviderAsync(provider.BaseUrl, provider.ApiKey);
         StatusLabel.Text = message;
         await ShowMessageAsync(message);
     }
@@ -653,7 +665,12 @@ public sealed partial class MainWindow : Window
 
     private async Task ShowProviderDialogAsync(ProviderItem? existing)
     {
-        var editing = existing?.Provider.Clone();
+        // 编辑前先补齐密钥：内存里可能是空 key（例如上次保存时留空），从加密存储读回来再填表单，
+        // 否则保存时会把这个空值当成「保留」，用户就再也看不到已存的 key 了。
+        var editing = existing is null ? null : _providerStore.Hydrate(existing.Provider).Clone();
+
+        // 预设可能不需要 Key（例如本地 Ollama）；编辑已有提供商时沿用原值，不要一律写成 true。
+        var requiresKey = editing?.RequiresKey ?? true;
 
         var presetCombo = new ComboBox
         {
@@ -668,6 +685,12 @@ public sealed partial class MainWindow : Window
         var urlBox = new TextBox { Header = "接口地址", Margin = new Thickness(0, 0, 0, 12), Text = editing?.BaseUrl ?? "" };
         var modelBox = new TextBox { Header = "模型", Margin = new Thickness(0, 0, 0, 12), Text = editing?.Model ?? "" };
         var keyBox = new PasswordBox { Header = "API Key", Margin = new Thickness(0, 0, 0, 12), Password = editing?.ApiKey ?? "" };
+        var requiresKeyBox = new CheckBox
+        {
+            Content = "需要 API Key",
+            IsChecked = requiresKey,
+            Margin = new Thickness(0, 0, 0, 12),
+        };
         var testText = new TextBlock
         {
             TextWrapping = TextWrapping.Wrap,
@@ -689,6 +712,7 @@ public sealed partial class MainWindow : Window
             nameBox.Text = preset.Name;
             urlBox.Text = preset.BaseUrl;
             modelBox.Text = preset.Model;
+            requiresKeyBox.IsChecked = preset.RequiresKey;
         };
 
         var content = new StackPanel { MinWidth = 420, Spacing = 0 };
@@ -697,6 +721,7 @@ public sealed partial class MainWindow : Window
         content.Children.Add(urlBox);
         content.Children.Add(modelBox);
         content.Children.Add(keyBox);
+        content.Children.Add(requiresKeyBox);
         content.Children.Add(testButton);
         content.Children.Add(testText);
 
@@ -721,7 +746,7 @@ public sealed partial class MainWindow : Window
                 BaseUrl = urlBox.Text,
                 Model = modelBox.Text,
                 ApiKey = keyBox.Password,
-                RequiresKey = true,
+                RequiresKey = requiresKeyBox.IsChecked == true,
             }, activate: true);
             _providerStore.Save(AppPaths.ProvidersFile);
             RefreshProviders();
