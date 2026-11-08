@@ -111,6 +111,34 @@ public sealed class JobRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task ReportsTranslateAndPolishProgress()
+    {
+        var file = CopyFixture("basic-utf8.srt");
+        var settings = new AppSettings { OutputMode = OutputMode.source, Polish = true };
+        var fileRecorder = new SyncProgress<JobProgress>();
+        var cueRecorder = new SyncProgress<CueProgress>();
+
+        var results = await Runner().RunAsync(
+            [file], settings, Path.Combine(_workDir, "output"), null,
+            fileProgress: fileRecorder, cueProgress: cueRecorder);
+
+        Assert.Equal(FileResult.StatusKind.success, results[0].Status);
+        Assert.Equal("basic-utf8.srt", fileRecorder.Values[0].CurrentName);
+        Assert.Equal("", fileRecorder.Values[^1].CurrentName);
+        Assert.Equal(1, fileRecorder.Values[^1].Completed);
+
+        var cues = cueRecorder.Values;
+        Assert.Equal("basic-utf8.srt", cues[0].FileName);
+        Assert.Equal(JobStage.translating, cues[0].Stage);
+        Assert.Equal(0, cues[0].Completed);
+        Assert.Contains(cues, cue => cue.Stage == JobStage.polishing);
+        Assert.Equal(JobStage.polishing, cues[^1].Stage);
+        Assert.Equal(3, cues[^1].Completed);
+        Assert.Equal(3, cues[^1].Total);
+        Assert.Equal(0, cues[^1].ErrorCount);
+    }
+
+    [Fact]
     public async Task OllamaBackendRunsWithSamePipeline()
     {
         var file = CopyFixture("basic-utf8.srt");

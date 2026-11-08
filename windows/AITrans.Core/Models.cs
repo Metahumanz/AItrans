@@ -52,6 +52,39 @@ public enum Language
     ko,
 }
 
+/// <summary>单个文件的处理阶段，对应 legacy 里两条独立的 tqdm 进度条。</summary>
+public enum JobStage
+{
+    translating,
+    polishing,
+}
+
+public static class JobStageNames
+{
+    public static string DisplayName(this JobStage stage) => stage switch
+    {
+        JobStage.translating => "翻译",
+        JobStage.polishing => "润色",
+        _ => "",
+    };
+}
+
+/// <summary>
+/// 当前文件在某个阶段内的段级进度。
+/// legacy 用 tqdm 显示「已完成段数 / 总段数」以及成功、失败计数；
+/// 这里把同样的信息交给界面，文件级进度仍由 <see cref="JobProgress"/> 负责。
+/// </summary>
+public sealed record CueProgress(
+    JobStage Stage,
+    int Completed,
+    int Total,
+    int SuccessCount,
+    int ErrorCount,
+    string FileName = "")
+{
+    public double Fraction => Total > 0 ? Math.Min(1, (double)Completed / Total) : 0;
+}
+
 public static class LanguageNames
 {
     public static string DisplayName(this Language language) =>

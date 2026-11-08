@@ -23,7 +23,7 @@ public sealed class JobRunner
         string outputDirectory,
         string? customDirectory,
         IProgress<JobProgress>? fileProgress = null,
-        IProgress<int>? cueProgress = null,
+        IProgress<CueProgress>? cueProgress = null,
         CancellationToken cancellationToken = default)
     {
         if (files.Count > MaxFiles)
@@ -41,6 +41,10 @@ public sealed class JobRunner
             fileProgress?.Report(new JobProgress(offset, pairs.Count, Path.GetFileName(source)));
 
             var name = Path.GetFileName(source);
+            // Translator 不关心文件名，由这里补上，界面才能判断段进度属于哪个文件。
+            IProgress<CueProgress>? cue = cueProgress is null
+                ? null
+                : new CueProgressRelay(cueProgress, name);
             if (!settings.Force && File.Exists(output) && new FileInfo(output).Length > 0)
             {
                 results.Add(new FileResult
@@ -71,7 +75,7 @@ public sealed class JobRunner
                 // 本地 Ollama 默认并发更低，避免显存吃紧。
                 var workers = settings.Backend == Engine.api ? settings.ApiWorkers : settings.OllamaWorkers;
                 var translated = await _translator.TranslateAsync(
-                    blocks, settings.Lang, workers, cueProgress, cancellationToken)
+                    blocks, settings.Lang, workers, cue, cancellationToken)
                     .ConfigureAwait(false);
 
                 var translations = translated.Translations;
@@ -81,7 +85,7 @@ public sealed class JobRunner
                     var polishWorkers = settings.Backend == Engine.api ? Spec.DefaultPolishWorkers : 1;
                     var polished = await _translator.PolishAsync(
                         blocks, translations, Spec.DefaultPolishBatchSize, polishWorkers,
-                        progress: null, cancellationToken: cancellationToken).ConfigureAwait(false);
+                        cue, cancellationToken).ConfigureAwait(false);
                     translations = polished.Translations;
                 }
 
@@ -119,5 +123,11 @@ public sealed class JobRunner
 
         fileProgress?.Report(new JobProgress(pairs.Count, pairs.Count, ""));
         return results;
+    }
+
+    /// <summary>给段级进度补上当前文件名，再转交给调用方。</summary>
+    private sealed class CueProgressRelay(IProgress<CueProgress> inner, string fileName) : IProgress<CueProgress>
+    {
+        public void Report(CueProgress value) => inner.Report(value with { FileName = fileName });
     }
 }

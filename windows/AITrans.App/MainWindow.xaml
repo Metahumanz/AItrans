@@ -421,7 +421,56 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="6">
-                            <ProgressBar x:Name="JobProgressBar" />
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    Text="文件"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <ProgressBar
+                                    x:Name="JobProgressBar"
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center" />
+                            </Grid>
+
+                            <!-- 对应 legacy 的 tqdm：翻译和润色各自按段推进，并显示成功/失败计数 -->
+                            <Grid
+                                x:Name="CueProgressRow"
+                                ColumnSpacing="8"
+                                Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    x:Name="CueStageLabel"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <ProgressBar
+                                    x:Name="CueProgressBar"
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center" />
+                                <TextBlock
+                                    x:Name="CueCountLabel"
+                                    Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    x:Name="CueStatsLabel"
+                                    Grid.Column="3"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </Grid>
+
                             <TextBlock
                                 x:Name="StatusLabel"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"

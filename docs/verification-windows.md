@@ -48,6 +48,7 @@ powershell -ExecutionPolicy Bypass -File windows\scripts\verify.ps1 -Publish
 | 润色后的组装 | `FixtureTests.AssemblePolishMatchesLegacy` | 含多行条目 |
 | 引号剥离 | `FixtureTests.StripQuotesHandlesBothQuoteStyles` | 中英文引号 |
 | 翻译 → 润色全链路 | `TranslatorTests.TranslateThenPolishMatchesLegacy` | 假模型驱动 |
+| 段级进度上报 | `TranslatorTests.TranslateReportsCueProgress` / `TranslatorTests.PolishReportsCueProgress` / `JobRunnerTests.ReportsTranslateAndPolishProgress` | 翻译、润色都按段推进，带成功/失败计数与文件名 |
 | 失败回退原文 | `TranslatorTests.FailureKeepsOriginal` | 单条失败不影响整体 |
 | 批量结果三种格式 | `TranslatorTests.Parses*` | `[n]` / `n.` / 纯行 |
 | 源目录 / 输出目录 / 自定义目录 | `OutputPathsTests` + `JobRunnerTests` | 路径规则与落盘 |
@@ -101,6 +102,9 @@ Passed!  - Failed:     0, Passed:    50+, Skipped:     0, Total:    50+
 - [ ] 切换导航时页面元素淡入上浮，不卡顿、不残留半透明
 - [ ] 添加 / 清空文件时列表条目有增删动效
 - [ ] 任务进行中「取消」能及时停止
+- [ ] 翻译时底部出现「翻译」进度条，按段推进并显示 `已完成/总段数` 与成功、失败计数
+- [ ] 开启润色后，翻译完成自动切换到「润色」进度条
+- [ ] 多文件时「文件」进度条按文件推进，当前文件的段级进度独立显示
 - [ ] 提供商页「添加」弹出编辑对话框；保存后出现在列表并标记「使用中」
 - [ ] 提供商页「测试连接」：正常 Key 返回 200，错误 Key 提示鉴权失败
 - [ ] 编辑已存密钥的提供商时，对话框里能看到原 Key（不显示为空）

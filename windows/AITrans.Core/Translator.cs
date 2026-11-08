@@ -36,7 +36,7 @@ public sealed class Translator
         IReadOnlyList<SrtBlock> blocks,
         Language language,
         int workers = Spec.DefaultTranslateWorkers,
-        IProgress<int>? progress = null,
+        IProgress<CueProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         var indices = Enumerable.Range(0, blocks.Count).Where(i => blocks[i].IsValid).ToList();
@@ -45,6 +45,10 @@ public sealed class Translator
         var system = Spec.TranslateSystemPrompt.Replace("{{lang}}", language.DisplayName());
         var width = Math.Max(1, workers);
         var finished = 0;
+        var success = 0;
+
+        // 与 legacy 的 tqdm 一致：任务一开始就显示 0/N，而不是等第一批完成才出现。
+        progress?.Report(new CueProgress(JobStage.translating, 0, indices.Count, 0, 0));
 
         for (var start = 0; start < indices.Count; start += width)
         {
@@ -74,6 +78,7 @@ public sealed class Translator
                 if (result.Text is not null)
                 {
                     translations[result.Index] = result.Text;
+                    success++;
                 }
                 else
                 {
@@ -82,7 +87,8 @@ public sealed class Translator
             }
 
             finished += wave.Count;
-            progress?.Report(finished);
+            progress?.Report(new CueProgress(
+                JobStage.translating, finished, indices.Count, success, failures.Count));
         }
 
         return new TranslateOutcome
@@ -99,7 +105,7 @@ public sealed class Translator
         IReadOnlyList<string?> translations,
         int batchSize = Spec.DefaultPolishBatchSize,
         int workers = Spec.DefaultPolishWorkers,
-        IProgress<int>? progress = null,
+        IProgress<CueProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         var working = translations.ToArray();
@@ -122,7 +128,9 @@ public sealed class Translator
         var width = Math.Max(1, workers);
         var polished = 0;
         var errors = 0;
-        var finishedBatches = 0;
+        var finishedCues = 0;
+
+        progress?.Report(new CueProgress(JobStage.polishing, 0, indices.Count, 0, 0));
 
         for (var start = 0; start < batches.Count; start += width)
         {
@@ -174,8 +182,10 @@ public sealed class Translator
                 errors += batch.Count - applied;
             }
 
-            finishedBatches += wave.Count;
-            progress?.Report(finishedBatches);
+            // 与 legacy 一样按「段」推进润色进度，而不是按批次。
+            finishedCues += wave.Sum(batchNumber => batches[batchNumber].Count);
+            progress?.Report(new CueProgress(
+                JobStage.polishing, finishedCues, indices.Count, polished, errors));
         }
 
         return new PolishOutcome

@@ -28,6 +28,10 @@ public sealed partial class MainWindow : Window
     private bool _initializing = true;
     private UpdateInfo? _updateInfo;
     private string? _startupWarning;
+    private CueProgress? _activeCueProgress;
+    private string _currentFileName = "";
+    private int _currentFileCompleted;
+    private int _currentFileTotal;
 
     public MainWindow()
     {
@@ -526,13 +530,42 @@ public sealed partial class MainWindow : Window
         JobProgressBar.IsIndeterminate = false;
         JobProgressBar.Value = 0;
         StatusLabel.Text = "准备开始…";
+        ClearCueProgress();
+        _currentFileName = "";
+        _currentFileCompleted = 0;
+        _currentFileTotal = 0;
 
         var progress = new Progress<JobProgress>(update =>
         {
             JobProgressBar.Value = update.Total == 0 ? 0 : update.Completed * 100.0 / update.Total;
+            _currentFileName = update.CurrentName;
+            _currentFileCompleted = update.Completed;
+            _currentFileTotal = update.Total;
+            // 文件事件和段事件是两条异步回调，顺序不保证。
+            // 如果段进度已经属于这个文件，就保留它，避免刚出现的进度条被清掉。
+            if (_activeCueProgress?.FileName != update.CurrentName)
+            {
+                ClearCueProgress();
+            }
             StatusLabel.Text = string.IsNullOrEmpty(update.CurrentName)
                 ? $"已完成 {update.Completed}/{update.Total}"
-                : $"正在处理 {update.CurrentName}（{update.Completed}/{update.Total}）";
+                : _activeCueProgress is { } cue && cue.FileName == update.CurrentName
+                    ? $"正在{cue.Stage.DisplayName()} {update.CurrentName}（{update.Completed}/{update.Total}）"
+                    : $"正在处理 {update.CurrentName}（{update.Completed}/{update.Total}）";
+        });
+
+        var cueProgress = new Progress<CueProgress>(update =>
+        {
+            _activeCueProgress = update;
+            if (!string.IsNullOrEmpty(update.FileName)) _currentFileName = update.FileName;
+            ShowCueProgress(update);
+            if (!string.IsNullOrEmpty(_currentFileName))
+            {
+                var counts = _currentFileTotal > 0
+                    ? $"（{_currentFileCompleted}/{_currentFileTotal}）"
+                    : "";
+                StatusLabel.Text = $"正在{update.Stage.DisplayName()} {_currentFileName}{counts}";
+            }
         });
 
         try
@@ -552,7 +585,8 @@ public sealed partial class MainWindow : Window
                 AppPaths.DefaultOutputDirectory,
                 customDirectory,
                 progress,
-                cancellationToken: _cts.Token);
+                cueProgress,
+                _cts.Token);
 
             foreach (var result in results)
             {
@@ -583,9 +617,36 @@ public sealed partial class MainWindow : Window
             StartButtonText.Text = "开始翻译";
             StartIcon.Glyph = "\uE768";
             JobProgressBar.IsIndeterminate = false;
+            ClearCueProgress();
+            _currentFileName = "";
+            _currentFileCompleted = 0;
+            _currentFileTotal = 0;
             _cts?.Dispose();
             _cts = null;
         }
+    }
+
+    /// <summary>显示当前文件的翻译 / 润色段级进度，对应 legacy 的 tqdm。</summary>
+    private void ShowCueProgress(CueProgress update)
+    {
+        CueProgressRow.Visibility = Visibility.Visible;
+        CueStageLabel.Text = update.Stage.DisplayName();
+        CueProgressBar.Value = update.Fraction * 100;
+        CueCountLabel.Text = $"{update.Completed}/{update.Total} 段";
+        CueStatsLabel.Text = $"成功 {update.SuccessCount} · 失败 {update.ErrorCount}";
+        CueStatsLabel.Foreground = update.ErrorCount > 0
+            ? UiBrush.Get("SystemFillColorCriticalBrush", Microsoft.UI.Colors.IndianRed)
+            : UiBrush.Get("TextFillColorSecondaryBrush", Microsoft.UI.Colors.Gray);
+    }
+
+    private void ClearCueProgress()
+    {
+        _activeCueProgress = null;
+        CueProgressRow.Visibility = Visibility.Collapsed;
+        CueProgressBar.Value = 0;
+        CueStageLabel.Text = "";
+        CueCountLabel.Text = "";
+        CueStatsLabel.Text = "";
     }
 
     // ---------------------------------------------------------------- 提供商
