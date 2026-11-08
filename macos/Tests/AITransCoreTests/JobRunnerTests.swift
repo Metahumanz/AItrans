@@ -132,6 +132,39 @@ final class JobRunnerTests: XCTestCase {
         }
     }
 
+    func testReportsTranslateAndPolishProgress() async throws {
+        let file = try copyFixture("basic-utf8.srt", to: workDir)
+        var settings = AppSettings()
+        settings.outputMode = .source
+        settings.polish = true
+
+        let fileRecorder = ProgressRecorder<JobProgress>()
+        let cueRecorder = ProgressRecorder<CueProgress>()
+        let results = try await makeRunner().run(
+            files: [file],
+            settings: settings,
+            outputDirectory: workDir.appending(path: "output"),
+            customDirectory: nil,
+            onFileProgress: { fileRecorder.append($0) },
+            onCueProgress: { cueRecorder.append($0) }
+        )
+
+        XCTAssertEqual(results.first?.status, .success)
+        XCTAssertEqual(fileRecorder.values.first?.currentName, "basic-utf8.srt")
+        XCTAssertEqual(fileRecorder.values.last?.currentName, "")
+        XCTAssertEqual(fileRecorder.values.last?.completed, 1)
+
+        let cues = cueRecorder.values
+        XCTAssertEqual(cues.first?.fileName, "basic-utf8.srt")
+        XCTAssertEqual(cues.first?.stage, .translating)
+        XCTAssertEqual(cues.first?.completed, 0)
+        XCTAssertTrue(cues.contains { $0.stage == .polishing })
+        XCTAssertEqual(cues.last?.stage, .polishing)
+        XCTAssertEqual(cues.last?.completed, 3)
+        XCTAssertEqual(cues.last?.total, 3)
+        XCTAssertEqual(cues.last?.errorCount, 0)
+    }
+
     func testOllamaBackendRunsWithSamePipeline() async throws {
         let file = try copyFixture("basic-utf8.srt", to: workDir)
         var settings = AppSettings()

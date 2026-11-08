@@ -13,6 +13,9 @@ final class AppState: ObservableObject {
     @Published var isRunning = false
     @Published var progress: Double = 0
     @Published var statusText = "拖入 .srt 文件或文件夹开始"
+    /// 当前正在处理的文件名与段级进度，用来显示 legacy 风格的翻译/润色进度条。
+    @Published var currentFileName = ""
+    @Published var activeCueProgress: CueProgress?
     @Published var alertMessage: String?
     @Published var providers: [Provider] = []
     @Published var activeProviderID: String?
@@ -147,6 +150,8 @@ final class AppState: ObservableObject {
         files.removeAll()
         results.removeAll()
         progress = 0
+        currentFileName = ""
+        activeCueProgress = nil
         statusText = "拖入 .srt 文件或文件夹开始"
     }
 
@@ -210,6 +215,8 @@ final class AppState: ObservableObject {
         isRunning = true
         progress = 0
         results.removeAll()
+        currentFileName = ""
+        activeCueProgress = nil
         statusText = "准备开始…"
 
         task = Task { [weak self] in
@@ -228,9 +235,33 @@ final class AppState: ObservableObject {
                     onFileProgress: { update in
                         Task { @MainActor in
                             self.progress = update.total == 0 ? 0 : Double(update.completed) / Double(update.total)
-                            self.statusText = update.currentName.isEmpty
-                                ? "完成"
-                                : "正在处理 \(update.currentName)"
+                            self.currentFileName = update.currentName
+                            // 文件事件和段事件是两条异步回调，顺序不保证。
+                            // 如果段进度已经属于这个文件，就保留它，避免刚出现的进度条被清掉。
+                            if self.activeCueProgress?.fileName != update.currentName {
+                                self.activeCueProgress = nil
+                            }
+                            if update.currentName.isEmpty {
+                                self.statusText = "完成"
+                            } else if let cue = self.activeCueProgress, cue.fileName == update.currentName {
+                                self.statusText = cue.stage == .translating
+                                    ? "正在翻译 \(update.currentName)"
+                                    : "正在润色 \(update.currentName)"
+                            } else {
+                                self.statusText = "正在处理 \(update.currentName)"
+                            }
+                        }
+                    },
+                    onCueProgress: { update in
+                        Task { @MainActor in
+                            self.activeCueProgress = update
+                            if !update.fileName.isEmpty {
+                                self.currentFileName = update.fileName
+                            }
+                            guard !self.currentFileName.isEmpty else { return }
+                            self.statusText = update.stage == .translating
+                                ? "正在翻译 \(self.currentFileName)"
+                                : "正在润色 \(self.currentFileName)"
                         }
                     }
                 )
@@ -240,6 +271,8 @@ final class AppState: ObservableObject {
                     }
                     self.progress = 1
                     self.isRunning = false
+                    self.currentFileName = ""
+                    self.activeCueProgress = nil
                     let ok = output.filter { $0.status == .success }.count
                     let skipped = output.filter { $0.status == .skipped }.count
                     let failed = output.filter { $0.status == .failed }.count
@@ -251,11 +284,15 @@ final class AppState: ObservableObject {
             } catch is CancellationError {
                 await MainActor.run {
                     self.isRunning = false
+                    self.currentFileName = ""
+                    self.activeCueProgress = nil
                     self.statusText = "已取消"
                 }
             } catch {
                 await MainActor.run {
                     self.isRunning = false
+                    self.currentFileName = ""
+                    self.activeCueProgress = nil
                     self.statusText = "已停止"
                     self.alertMessage = error.localizedDescription
                 }

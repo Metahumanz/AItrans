@@ -84,6 +84,61 @@ final class TranslatorTests: XCTestCase {
         }
     }
 
+    func testTranslateReportsCueProgress() async throws {
+        let blocks = try loadBlocks("basic-utf8.srt")
+        let translator = Translator(client: FakeChatClient())
+        let recorder = ProgressRecorder<CueProgress>()
+
+        _ = try await translator.translate(blocks: blocks, language: .zh, workers: 2) {
+            recorder.append($0)
+        }
+
+        let values = recorder.values
+        XCTAssertEqual(
+            values.first,
+            CueProgress(stage: .translating, completed: 0, total: 3, successCount: 0, errorCount: 0)
+        )
+        XCTAssertEqual(values.map(\.completed), [0, 2, 3])
+        XCTAssertEqual(
+            values.last,
+            CueProgress(stage: .translating, completed: 3, total: 3, successCount: 3, errorCount: 0)
+        )
+    }
+
+    func testPolishReportsCueProgress() async throws {
+        let blocks = try loadBlocks("basic-utf8.srt")
+        let translator = Translator(client: FakeChatClient())
+        let translated = try await translator.translate(blocks: blocks, language: .zh, workers: 3)
+        let recorder = ProgressRecorder<CueProgress>()
+
+        let polished = try await translator.polish(
+            blocks: blocks,
+            translations: translated.translations,
+            batchSize: 2,
+            workers: 1
+        ) {
+            recorder.append($0)
+        }
+
+        let values = recorder.values
+        XCTAssertEqual(
+            values.first,
+            CueProgress(stage: .polishing, completed: 0, total: 3, successCount: 0, errorCount: 0)
+        )
+        // 每批 2 条，串行润色：0 → 2 → 3，按段推进而不是按批次数。
+        XCTAssertEqual(values.map(\.completed), [0, 2, 3])
+        XCTAssertEqual(
+            values.last,
+            CueProgress(
+                stage: .polishing,
+                completed: 3,
+                total: 3,
+                successCount: polished.polishedCount,
+                errorCount: polished.errorCount
+            )
+        )
+    }
+
     func testTranslateFailureKeepsOriginal() async throws {
         struct FailingClient: ChatCompleting {
             func complete(messages: [ChatMessage]) async throws -> String {
@@ -92,9 +147,14 @@ final class TranslatorTests: XCTestCase {
         }
         let blocks = try loadBlocks("basic-utf8.srt")
         let translator = Translator(client: FailingClient())
-        let outcome = try await translator.translate(blocks: blocks, language: .zh, workers: 2)
+        let recorder = ProgressRecorder<CueProgress>()
+        let outcome = try await translator.translate(blocks: blocks, language: .zh, workers: 2) {
+            recorder.append($0)
+        }
         XCTAssertEqual(outcome.successCount, 0)
         XCTAssertEqual(outcome.errorCount, 3)
+        XCTAssertEqual(recorder.values.last?.successCount, 0)
+        XCTAssertEqual(recorder.values.last?.errorCount, 3)
         // 失败块回退为原文，输出仍应可组装。
         let text = SRT.assemble(blocks, translations: outcome.translations)
         XCTAssertTrue(text.contains("Good morning, everyone."))

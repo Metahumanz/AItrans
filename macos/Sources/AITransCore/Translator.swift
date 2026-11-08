@@ -40,7 +40,7 @@ public struct Translator: Sendable {
         blocks: [SRTBlock],
         language: Language,
         workers: Int = Spec.defaultTranslateWorkers,
-        onProgress: (@Sendable (Int, Int) -> Void)? = nil
+        onProgress: (@Sendable (CueProgress) -> Void)? = nil
     ) async throws -> TranslateOutcome {
         let indices = blocks.indices.filter { blocks[$0].isValid }
         var translations = [String?](repeating: nil, count: blocks.count)
@@ -48,6 +48,16 @@ public struct Translator: Sendable {
         let system = Spec.translateSystemPrompt.replacingOccurrences(of: "{{lang}}", with: language.displayName)
         let width = max(1, workers)
         var finished = 0
+        var success = 0
+
+        // 与 legacy 的 tqdm 一致：任务一开始就显示 0/N，而不是等第一批完成才出现。
+        onProgress?(CueProgress(
+            stage: .translating,
+            completed: 0,
+            total: indices.count,
+            successCount: 0,
+            errorCount: 0
+        ))
 
         for start in stride(from: 0, to: indices.count, by: width) {
             if Task.isCancelled { throw CancellationError() }
@@ -77,12 +87,19 @@ public struct Translator: Sendable {
                 switch result {
                 case .success(let text):
                     translations[index] = text
+                    success += 1
                 case .failure(let error):
                     failures.append(TranslateFailure(index: index, message: Self.message(for: error)))
                 }
             }
             finished += wave.count
-            onProgress?(finished, indices.count)
+            onProgress?(CueProgress(
+                stage: .translating,
+                completed: finished,
+                total: indices.count,
+                successCount: success,
+                errorCount: failures.count
+            ))
         }
 
         return TranslateOutcome(
@@ -100,7 +117,7 @@ public struct Translator: Sendable {
         translations: [String?],
         batchSize: Int = Spec.defaultPolishBatchSize,
         workers: Int = Spec.defaultPolishWorkers,
-        onProgress: (@Sendable (Int, Int) -> Void)? = nil
+        onProgress: (@Sendable (CueProgress) -> Void)? = nil
     ) async throws -> PolishOutcome {
         var working = translations
         let indices = blocks.indices.filter { blocks[$0].isValid && translations[$0] != nil }
@@ -115,7 +132,15 @@ public struct Translator: Sendable {
         let width = max(1, workers)
         var polished = 0
         var errors = 0
-        var finished = 0
+        var finishedCues = 0
+
+        onProgress?(CueProgress(
+            stage: .polishing,
+            completed: 0,
+            total: indices.count,
+            successCount: 0,
+            errorCount: 0
+        ))
 
         for start in stride(from: 0, to: batches.count, by: width) {
             if Task.isCancelled { throw CancellationError() }
@@ -168,8 +193,15 @@ public struct Translator: Sendable {
                 }
             }
 
-            finished += wave.count
-            onProgress?(finished, batches.count)
+            // 与 legacy 一样按「段」推进润色进度，而不是按批次。
+            finishedCues += wave.reduce(0) { $0 + batches[$1].count }
+            onProgress?(CueProgress(
+                stage: .polishing,
+                completed: finishedCues,
+                total: indices.count,
+                successCount: polished,
+                errorCount: errors
+            ))
         }
 
         return PolishOutcome(translations: working, polishedCount: polished, errorCount: errors)

@@ -75,6 +75,54 @@ public enum OutputMode: String, Codable, Sendable, CaseIterable {
     case custom
 }
 
+/// 单个文件的处理阶段，对应 legacy 里两条独立的 tqdm 进度条。
+public enum JobStage: String, Sendable, Equatable, Hashable {
+    case translating
+    case polishing
+
+    public var displayName: String {
+        switch self {
+        case .translating: return "翻译"
+        case .polishing: return "润色"
+        }
+    }
+}
+
+/// 当前文件在某个阶段内的段级进度。
+///
+/// legacy 用 tqdm 显示「已完成段数 / 总段数」以及成功、失败计数；
+/// 这里把同样的信息交给界面，文件级进度仍由 `JobProgress` 负责。
+public struct CueProgress: Sendable, Equatable {
+    /// 产生这条进度的文件名；Translator 不关心文件名，由 JobRunner 填。
+    public let fileName: String
+    public let stage: JobStage
+    public let completed: Int
+    public let total: Int
+    public let successCount: Int
+    public let errorCount: Int
+
+    public init(
+        fileName: String = "",
+        stage: JobStage,
+        completed: Int,
+        total: Int,
+        successCount: Int,
+        errorCount: Int
+    ) {
+        self.fileName = fileName
+        self.stage = stage
+        self.completed = completed
+        self.total = total
+        self.successCount = successCount
+        self.errorCount = errorCount
+    }
+
+    public var fraction: Double {
+        guard total > 0 else { return 0 }
+        return min(1, Double(completed) / Double(total))
+    }
+}
+
 /// 界面设置，持久化到 `settings.json`。
 public struct AppSettings: Sendable, Equatable, Codable {
     public var version: Int = 1

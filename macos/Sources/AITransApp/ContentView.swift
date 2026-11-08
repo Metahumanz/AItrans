@@ -222,19 +222,44 @@ struct ContentView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 12) {
-            ProgressView(value: state.progress)
-                .progressViewStyle(.linear)
-                .frame(maxWidth: 220)
-            Text(state.statusText)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            Spacer()
-            if !state.files.isEmpty {
-                Button("清空") { state.clearFiles() }
-                    .buttonStyle(.link)
-                    .disabled(state.isRunning)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Text("文件")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, alignment: .leading)
+                ProgressView(value: state.progress)
+                    .progressViewStyle(.linear)
+                    .frame(maxWidth: 220)
+                Text(state.statusText)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Spacer()
+                if !state.files.isEmpty {
+                    Button("清空") { state.clearFiles() }
+                        .buttonStyle(.link)
+                        .disabled(state.isRunning)
+                }
+            }
+
+            // 对应 legacy 的 tqdm：翻译和润色各自按段推进，并显示成功/失败计数。
+            if state.isRunning, let cue = state.activeCueProgress, cue.total > 0 {
+                HStack(spacing: 8) {
+                    Text(cue.stage.displayName)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, alignment: .leading)
+                    ProgressView(value: cue.fraction)
+                        .progressViewStyle(.linear)
+                        .frame(maxWidth: 220)
+                    Text("\(cue.completed)/\(cue.total) 段")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    Text("成功 \(cue.successCount) · 失败 \(cue.errorCount)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(cue.errorCount > 0 ? Color.red : Color.secondary)
+                }
             }
         }
         .padding(.horizontal, 16)

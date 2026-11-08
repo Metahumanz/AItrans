@@ -27,7 +27,7 @@ public struct JobRunner: Sendable {
         outputDirectory: URL,
         customDirectory: URL?,
         onFileProgress: (@Sendable (JobProgress) -> Void)? = nil,
-        onCueProgress: (@Sendable (Int, Int) -> Void)? = nil
+        onCueProgress: (@Sendable (CueProgress) -> Void)? = nil
     ) async throws -> [FileResult] {
         guard files.count <= Self.maxFiles else {
             throw AITransError("一次最多处理 \(Self.maxFiles) 个文件。")
@@ -51,6 +51,16 @@ public struct JobRunner: Sendable {
             ))
 
             let name = pair.source.lastPathComponent
+            let reportCueProgress: @Sendable (CueProgress) -> Void = { update in
+                onCueProgress?(CueProgress(
+                    fileName: name,
+                    stage: update.stage,
+                    completed: update.completed,
+                    total: update.total,
+                    successCount: update.successCount,
+                    errorCount: update.errorCount
+                ))
+            }
             if !settings.force, let size = try? pair.output.resourceValues(forKeys: [.fileSizeKey]).fileSize, size > 0 {
                 results.append(FileResult(
                     name: name,
@@ -75,7 +85,7 @@ public struct JobRunner: Sendable {
                     blocks: blocks,
                     language: settings.lang,
                     workers: workers,
-                    onProgress: onCueProgress
+                    onProgress: reportCueProgress
                 )
 
                 var translations = translated.translations
@@ -86,7 +96,8 @@ public struct JobRunner: Sendable {
                         blocks: blocks,
                         translations: translations,
                         batchSize: Spec.defaultPolishBatchSize,
-                        workers: polishWorkers
+                        workers: polishWorkers,
+                        onProgress: reportCueProgress
                     )
                     translations = polished.translations
                 }

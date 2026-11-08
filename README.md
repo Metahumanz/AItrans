@@ -65,7 +65,7 @@ ISCC.exe /DMyAppVersion=0.3.5 windows\installer\AITrans.iss
 - 拖拽 / 系统选择器 / 粘贴路径三种方式添加字幕，单次最多 200 个文件；
 - API 与本地 Ollama 两种引擎，四种目标语言，翻译与润色可分别开关；
 - 输出到源文件目录（加后缀）、应用输出目录或自定义目录；
-- 并发与重试可调，任务可取消，进度与结果逐文件展示；
+- 并发与重试可调，任务可取消；macOS 端在文件级进度之外，翻译 / 润色阶段还会按段显示进度与成功、失败计数；
 - 提供商管理：9 个预设、增删改、切换、连通性测试、清除已保存的密钥；
 - 提供商地址：macOS 上公网接口必须用 `https://`；`localhost`、回环与私有网段（含 Ollama 默认的 `http://localhost:11434`）可继续用 `http://`，打包脚本已在 `Info.plist` 声明对应的 ATS 例外（Windows 不受影响）；
 - 密钥保存在本地：macOS 用 `secrets.json`（**明文**，0600，不使用钥匙串），Windows 用 DPAPI 加密的 `secrets.dat`；`providers.json` 中不写明文；
