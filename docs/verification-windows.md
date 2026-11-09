@@ -132,7 +132,7 @@ Passed!  - Failed:     0, Passed:    50+, Skipped:     0, Total:    50+
 
 ### 安装包
 
-用 `ISCC.exe /DMyAppVersion=0.3.5 windows\installer\AITrans.iss` 生成 `windows\dist\AITrans-0.3.5-win-x64-setup.exe`：
+用 `ISCC.exe /DMyAppVersion=0.3.6 windows\installer\AITrans.iss` 生成 `windows\dist\AITrans-0.3.6-win-x64-setup.exe`：
 
 - [ ] 向导为简体中文，首个对话框可选「仅为我安装 / 为所有用户安装」
 - [ ] 「准备安装」页列出两个运行时依赖与下载链接
