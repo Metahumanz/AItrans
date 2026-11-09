@@ -16,7 +16,7 @@ swift test
 open dist/AITrans.app
 ```
 
-- [x] 测试全绿（当前 65 个，其中 2 个真实接口用例默认跳过；v0.3.5 的 release 工作流已在 macos-15 上跑过）
+- [x] 测试全绿（当前 65 个，其中 2 个真实接口用例默认跳过；v0.3.6 的 release 工作流已在 macos-15 上跑过）
 - [x] 打包生成 `macos/dist/AITrans.app`、zip 与 dmg
 - [x] 启动后出现主窗口（本机用 `open` 验证，窗口 900×612）
 - [ ] 双击启动后菜单栏显示 AITrans
@@ -111,7 +111,7 @@ open dist/AITrans.app
 
 已验证：
 
-- `swift test --disable-sandbox`：65 个测试，2 个跳过，0 失败（2026-11-08 本机重跑；v0.3.5 的 Release macOS 工作流在 macos-15 上执行）。
+- `swift test --disable-sandbox`：65 个测试，2 个跳过，0 失败（2026-11-08 本机重跑；v0.3.6 的 Release macOS 工作流在 macos-15 上执行）。
 - `package-app.sh 0.3.2` 能生成 `AITrans.app`、zip 和 dmg。
 - `package-app.sh 0.3.5` 能生成 app / zip / dmg；本地 dmg 可挂载、版本 0.3.5、卷内 `Applications` 软链与 ad-hoc 签名校验通过（2026-11-05）。
 - Release v0.3.2 的 dmg 能挂载：UDZO/UDIF、尾部 `koly`、卷内 `Applications -> /Applications` 软链、App 版本 0.3.2、ad-hoc 签名校验通过。
@@ -120,7 +120,7 @@ open dist/AITrans.app
 - v0.3.3：读取密钥不再创建目录或锁文件，新增「清除已保存的密钥」；Release 已发布 dmg（约 0.8 MB）与 zip（约 0.45 MB）。
 - v0.3.4：删除提供商 / 清除密钥前增加确认；公网 `http://` 提供商保存时拒绝并提示改用 https；显示名统一为 `AITrans`；清理 `ContentView` 的未使用变量警告。Release 已发布 dmg（约 0.8 MB）与 zip（约 0.45 MB），macOS 60 个测试全绿。
 - v0.3.5：打包 App 在 `Info.plist` 声明本机/局域网 ATS 例外；Ollama 默认地址改为 `http://localhost:11434`；Release 已发布 dmg（约 0.8 MB）与 zip（约 0.45 MB），macOS 62 个测试全绿。发布包实测 `localhost`、`127.0.0.1` 与局域网 IP 的 http 均放行，公网 http 仍被拦截。
-- 当前开发版：底部新增当前文件的「翻译 / 润色」段级进度条（对应 legacy 的 tqdm），并显示段数与成功、失败计数；macOS 65 个测试全绿（2026-11-08）。
+- v0.3.6：双端新增翻译 / 润色段级进度条；Release 已发布 macOS dmg（约 0.8 MB）、zip（约 0.46 MB）与 Windows setup（约 8.2 MB）、zip（约 10.1 MB），macOS 65 个、Windows 80 个测试全绿（2026-11-09）。
 
 已知限制：
 

@@ -33,18 +33,18 @@ Release 正文由 `.github/actions/release-notes` 统一生成：首次打开说
 本次提交列表。升级提示只在 `0.3.x` 输出（钥匙串 → `secrets.json` 的迁移只影响这一代），之后的版本不再
 重复；两个平台共用同一个 composite action，改一处即可，不依赖 commit message。
 
-### 最近一次发布（v0.3.5）
+### 最近一次发布（v0.3.6）
 
-2026-11-05 推送 tag 后两个工作流均成功，Release 已发布 4 个产物：
+2026-11-09 推送 tag 后两个工作流均成功，Release 已发布 4 个产物：
 
 | 平台 | 产物 | 大小 |
 | --- | --- | --- |
-| macOS | `AITrans-0.3.5-arm64.dmg` | 0.8 MB |
-| macOS | `AITrans-0.3.5-arm64.zip` | 0.45 MB |
-| Windows | `AITrans-0.3.5-win-x64-setup.exe` | 8.2 MB |
-| Windows | `AITrans-0.3.5-win-x64.zip` | 10.1 MB |
+| macOS | `AITrans-0.3.6-arm64.dmg` | 0.8 MB |
+| macOS | `AITrans-0.3.6-arm64.zip` | 0.46 MB |
+| Windows | `AITrans-0.3.6-win-x64-setup.exe` | 8.2 MB |
+| Windows | `AITrans-0.3.6-win-x64.zip` | 10.1 MB |
 
-测试：macOS 62 个（2 个真实接口用例跳过）、Windows 77 个，均 0 失败；Release 正文按 `0.3.x` 输出了升级提示。
+测试：macOS 65 个（2 个真实接口用例跳过）、Windows 80 个，均 0 失败；Release 正文按 `0.3.x` 输出了升级提示。
 
 ## 2. 产物
 
