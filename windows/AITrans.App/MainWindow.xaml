@@ -477,17 +477,42 @@
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Text="拖入 .srt 文件或文件夹开始" />
                         </StackPanel>
-                        <Button
-                            x:Name="StartButton"
+                        <StackPanel
                             Grid.Column="1"
-                            MinWidth="132"
-                            Click="OnStart"
-                            Style="{StaticResource AccentButtonStyle}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon x:Name="StartIcon" FontSize="14" Glyph="&#xE768;" />
-                                <TextBlock x:Name="StartButtonText" Text="开始翻译" />
-                            </StackPanel>
-                        </Button>
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            VerticalAlignment="Center">
+                            <Button
+                                x:Name="StartButton"
+                                MinWidth="132"
+                                Click="OnStart"
+                                Style="{StaticResource AccentButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon x:Name="StartIcon" FontSize="14" Glyph="&#xE768;" />
+                                    <TextBlock x:Name="StartButtonText" Text="开始翻译" />
+                                </StackPanel>
+                            </Button>
+                            <Button
+                                x:Name="PauseButton"
+                                MinWidth="96"
+                                Click="OnPause"
+                                Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon x:Name="PauseIcon" FontSize="14" Glyph="&#xE769;" />
+                                    <TextBlock x:Name="PauseButtonText" Text="暂停" />
+                                </StackPanel>
+                            </Button>
+                            <Button
+                                x:Name="CancelButton"
+                                MinWidth="96"
+                                Click="OnCancel"
+                                Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon FontSize="14" Glyph="&#xE711;" />
+                                    <TextBlock Text="取消" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </Grid>
                 </Grid>
 

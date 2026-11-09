@@ -22,6 +22,7 @@ public sealed class JobRunner
         AppSettings settings,
         string outputDirectory,
         string? customDirectory,
+        PauseGate? pauseGate = null,
         IProgress<JobProgress>? fileProgress = null,
         IProgress<CueProgress>? cueProgress = null,
         CancellationToken cancellationToken = default)
@@ -36,6 +37,10 @@ public sealed class JobRunner
         var results = new List<FileResult>(pairs.Count);
         for (var offset = 0; offset < pairs.Count; offset++)
         {
+            if (pauseGate is not null)
+            {
+                await pauseGate.WaitIfPausedAsync(cancellationToken).ConfigureAwait(false);
+            }
             cancellationToken.ThrowIfCancellationRequested();
             var (source, output) = pairs[offset];
             fileProgress?.Report(new JobProgress(offset, pairs.Count, Path.GetFileName(source)));
@@ -75,7 +80,8 @@ public sealed class JobRunner
                 // 本地 Ollama 默认并发更低，避免显存吃紧。
                 var workers = settings.Backend == Engine.api ? settings.ApiWorkers : settings.OllamaWorkers;
                 var translated = await _translator.TranslateAsync(
-                    blocks, settings.Lang, workers, cue, cancellationToken)
+                    blocks, settings.Lang, workers,
+                    pauseGate: pauseGate, progress: cue, cancellationToken: cancellationToken)
                     .ConfigureAwait(false);
 
                 var translations = translated.Translations;
@@ -85,7 +91,8 @@ public sealed class JobRunner
                     var polishWorkers = settings.Backend == Engine.api ? Spec.DefaultPolishWorkers : 1;
                     var polished = await _translator.PolishAsync(
                         blocks, translations, Spec.DefaultPolishBatchSize, polishWorkers,
-                        cue, cancellationToken).ConfigureAwait(false);
+                        pauseGate: pauseGate, progress: cue, cancellationToken: cancellationToken)
+                        .ConfigureAwait(false);
                     translations = polished.Translations;
                 }
 

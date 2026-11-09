@@ -55,7 +55,8 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.19041
 CloseApplications=yes
-RestartApplications=no
+; 自更新时安装包会先关闭 AITrans，装完再把它拉起来。
+RestartApplications=yes
 ; 按系统语言自动选，不弹语言选择框：中文系统直接进简体中文向导，
 ; 英文系统用 Default.isl。需要强制指定时仍可传 /LANG=en。
 ShowLanguageDialog=no

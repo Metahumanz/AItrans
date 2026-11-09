@@ -101,6 +101,26 @@ public sealed class TranslatorTests
     }
 
     [Fact]
+    public async Task TranslateHonorsPauseGateBeforeFirstWave()
+    {
+        var blocks = FixtureTests.Blocks("basic-utf8.srt");
+        var gate = new PauseGate();
+        gate.Pause();
+        var recorder = new SyncProgress<CueProgress>();
+
+        var task = new Translator(new FakeChatClient()).TranslateAsync(
+            blocks, Language.zh, workers: 1, pauseGate: gate, progress: recorder);
+
+        await Task.Delay(100);
+        Assert.Empty(recorder.Values);
+
+        gate.Resume();
+        var outcome = await task;
+        Assert.Equal(3, outcome.SuccessCount);
+        Assert.Equal(3, recorder.Values[^1].Completed);
+    }
+
+    [Fact]
     public async Task FailureKeepsOriginal()
     {
         var blocks = FixtureTests.Blocks("basic-utf8.srt");

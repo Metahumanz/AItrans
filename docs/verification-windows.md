@@ -49,6 +49,7 @@ powershell -ExecutionPolicy Bypass -File windows\scripts\verify.ps1 -Publish
 | 引号剥离 | `FixtureTests.StripQuotesHandlesBothQuoteStyles` | 中英文引号 |
 | 翻译 → 润色全链路 | `TranslatorTests.TranslateThenPolishMatchesLegacy` | 假模型驱动 |
 | 段级进度上报 | `TranslatorTests.TranslateReportsCueProgress` / `TranslatorTests.PolishReportsCueProgress` / `JobRunnerTests.ReportsTranslateAndPolishProgress` | 翻译、润色都按段推进，带成功/失败计数与文件名 |
+| 暂停 / 继续 / 取消 | `PauseGateTests` + `TranslatorTests.TranslateHonorsPauseGateBeforeFirstWave` + `JobRunnerTests.PauseGateStopsBeforeStartingFiles` / `CancelWakesPausedJob` | 暂停在波次之间生效，取消能唤醒暂停中的等待 |
 | 失败回退原文 | `TranslatorTests.FailureKeepsOriginal` | 单条失败不影响整体 |
 | 批量结果三种格式 | `TranslatorTests.Parses*` | `[n]` / `n.` / 纯行 |
 | 源目录 / 输出目录 / 自定义目录 | `OutputPathsTests` + `JobRunnerTests` | 路径规则与落盘 |
@@ -102,6 +103,9 @@ Passed!  - Failed:     0, Passed:    50+, Skipped:     0, Total:    50+
 - [ ] 切换导航时页面元素淡入上浮，不卡顿、不残留半透明
 - [ ] 添加 / 清空文件时列表条目有增删动效
 - [ ] 任务进行中「取消」能及时停止
+- [ ] 运行中出现「暂停」「取消」按钮，「开始」变灰；点「暂停」后当前批次跑完停住，状态显示「已暂停」
+- [ ] 点「继续」从下一批接着处理，进度条继续推进
+- [ ] 暂停状态下点「取消」能立即结束任务，状态显示「已取消」
 - [ ] 翻译时底部出现「翻译」进度条，按段推进并显示 `已完成/总段数` 与成功、失败计数
 - [ ] 开启润色后，翻译完成自动切换到「润色」进度条
 - [ ] 多文件时「文件」进度条按文件推进，当前文件的段级进度独立显示
@@ -126,6 +130,8 @@ Passed!  - Failed:     0, Passed:    50+, Skipped:     0, Total:    50+
 - [ ] 启动阶段不读 `secrets.dat`；开始任务 / 测试连接 / 打开编辑对话框时才读取
 - [ ] 手动改坏 `secrets.dat` 后启动，会弹出带路径的可读错误，而不是静默丢 Key
 - [ ] 「检查更新」能读到 GitHub 最新 release
+- [ ] 安装版「下载并安装」：下载安装包后自动启动，AITrans 关闭并在安装完成后自动重启，版本号更新
+- [ ] 便携版仍下载 zip 并定位到文件，按提示解压覆盖
 - [ ] 启动约 3 秒后自动检查一次；有新版本时任务页顶部出现提示条（不弹窗），「查看更新」能打开下载页
 - [ ] 「关于 → 维护」里关掉自动检查后，重启不再自动请求
 - [ ] 「打开输出目录」能打开资源管理器

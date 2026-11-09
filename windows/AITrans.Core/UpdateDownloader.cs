@@ -1,7 +1,8 @@
 namespace AITrans.Core;
 
 /// <summary>
-/// 下载新版本到本地。不做静默自替换：未签名分发下自动覆盖安装目录风险过高。
+/// 下载新版本到本地。安装版的静默升级见 <see cref="UpdateInstaller"/>；
+/// 便携版仍由用户退出后手动替换。
 /// </summary>
 public static class UpdateDownloader
 {
@@ -37,5 +38,5 @@ public static class UpdateDownloader
     }
 
     public const string InstallHint =
-        "已下载到「下载」文件夹。退出 AITrans，解压后覆盖旧版本即可。";
+        "已下载到「下载」文件夹。退出 AITrans，解压后用新文件覆盖当前目录即可。";
 }

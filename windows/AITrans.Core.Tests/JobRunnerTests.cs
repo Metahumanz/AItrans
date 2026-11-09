@@ -139,6 +139,47 @@ public sealed class JobRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task PauseGateStopsBeforeStartingFiles()
+    {
+        var file = CopyFixture("basic-utf8.srt");
+        var settings = new AppSettings { OutputMode = OutputMode.source, Polish = false, Force = true };
+        var gate = new PauseGate();
+        gate.Pause();
+        var fileRecorder = new SyncProgress<JobProgress>();
+
+        var task = Runner().RunAsync(
+            [file], settings, _workDir, null,
+            pauseGate: gate, fileProgress: fileRecorder);
+
+        await Task.Delay(100);
+        Assert.Empty(fileRecorder.Values);
+
+        gate.Resume();
+        var results = await task;
+        Assert.Equal(FileResult.StatusKind.success, results[0].Status);
+    }
+
+    [Fact]
+    public async Task CancelWakesPausedJob()
+    {
+        var file = CopyFixture("basic-utf8.srt");
+        var settings = new AppSettings { OutputMode = OutputMode.source, Polish = false };
+        var gate = new PauseGate();
+        gate.Pause();
+        using var cts = new CancellationTokenSource();
+
+        var task = Runner().RunAsync(
+            [file], settings, _workDir, null,
+            pauseGate: gate, cancellationToken: cts.Token);
+
+        await Task.Delay(100);
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
+        Assert.False(File.Exists(Path.Combine(_workDir, "basic-utf8_translated.srt")));
+    }
+
+    [Fact]
     public async Task OllamaBackendRunsWithSamePipeline()
     {
         var file = CopyFixture("basic-utf8.srt");

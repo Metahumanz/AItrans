@@ -36,6 +36,7 @@ public sealed class Translator
         IReadOnlyList<SrtBlock> blocks,
         Language language,
         int workers = Spec.DefaultTranslateWorkers,
+        PauseGate? pauseGate = null,
         IProgress<CueProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -47,11 +48,20 @@ public sealed class Translator
         var finished = 0;
         var success = 0;
 
+        if (pauseGate is not null)
+        {
+            await pauseGate.WaitIfPausedAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         // 与 legacy 的 tqdm 一致：任务一开始就显示 0/N，而不是等第一批完成才出现。
         progress?.Report(new CueProgress(JobStage.translating, 0, indices.Count, 0, 0));
 
         for (var start = 0; start < indices.Count; start += width)
         {
+            if (pauseGate is not null)
+            {
+                await pauseGate.WaitIfPausedAsync(cancellationToken).ConfigureAwait(false);
+            }
             cancellationToken.ThrowIfCancellationRequested();
             var wave = indices.Skip(start).Take(width).ToList();
 
@@ -105,6 +115,7 @@ public sealed class Translator
         IReadOnlyList<string?> translations,
         int batchSize = Spec.DefaultPolishBatchSize,
         int workers = Spec.DefaultPolishWorkers,
+        PauseGate? pauseGate = null,
         IProgress<CueProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -130,10 +141,19 @@ public sealed class Translator
         var errors = 0;
         var finishedCues = 0;
 
+        if (pauseGate is not null)
+        {
+            await pauseGate.WaitIfPausedAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         progress?.Report(new CueProgress(JobStage.polishing, 0, indices.Count, 0, 0));
 
         for (var start = 0; start < batches.Count; start += width)
         {
+            if (pauseGate is not null)
+            {
+                await pauseGate.WaitIfPausedAsync(cancellationToken).ConfigureAwait(false);
+            }
             cancellationToken.ThrowIfCancellationRequested();
             var wave = Enumerable.Range(start, Math.Min(width, batches.Count - start)).ToList();
 

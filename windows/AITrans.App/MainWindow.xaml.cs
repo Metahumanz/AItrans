@@ -25,6 +25,8 @@ public sealed partial class MainWindow : Window
 
     private CancellationTokenSource? _cts;
     private bool _running;
+    private bool _paused;
+    private PauseGate? _pauseGate;
     private bool _initializing = true;
     private UpdateInfo? _updateInfo;
     private string? _startupWarning;
@@ -457,11 +459,7 @@ public sealed partial class MainWindow : Window
 
     private async void OnStart(object sender, RoutedEventArgs e)
     {
-        if (_running)
-        {
-            _cts?.Cancel();
-            return;
-        }
+        if (_running) return;
 
         if (_files.Count == 0)
         {
@@ -522,11 +520,17 @@ public sealed partial class MainWindow : Window
                 policy: new RetryPolicy(settings.ApiRetries));
         var runner = new JobRunner(new Translator(client));
 
+        var gate = new PauseGate();
+        _pauseGate = gate;
+        _paused = false;
         _cts = new CancellationTokenSource();
         _running = true;
         foreach (var item in _files) item.Result = null;
-        StartButtonText.Text = "取消";
-        StartIcon.Glyph = "\uE711";
+        StartButton.IsEnabled = false;
+        PauseButton.Visibility = Visibility.Visible;
+        PauseButtonText.Text = "暂停";
+        PauseIcon.Glyph = "\uE769";
+        CancelButton.Visibility = Visibility.Visible;
         JobProgressBar.IsIndeterminate = false;
         JobProgressBar.Value = 0;
         StatusLabel.Text = "准备开始…";
@@ -547,6 +551,7 @@ public sealed partial class MainWindow : Window
             {
                 ClearCueProgress();
             }
+            if (_paused) return;
             StatusLabel.Text = string.IsNullOrEmpty(update.CurrentName)
                 ? $"已完成 {update.Completed}/{update.Total}"
                 : _activeCueProgress is { } cue && cue.FileName == update.CurrentName
@@ -559,6 +564,7 @@ public sealed partial class MainWindow : Window
             _activeCueProgress = update;
             if (!string.IsNullOrEmpty(update.FileName)) _currentFileName = update.FileName;
             ShowCueProgress(update);
+            if (_paused) return;
             if (!string.IsNullOrEmpty(_currentFileName))
             {
                 var counts = _currentFileTotal > 0
@@ -584,9 +590,10 @@ public sealed partial class MainWindow : Window
                 settings,
                 AppPaths.DefaultOutputDirectory,
                 customDirectory,
-                progress,
-                cueProgress,
-                _cts.Token);
+                pauseGate: gate,
+                fileProgress: progress,
+                cueProgress: cueProgress,
+                cancellationToken: _cts.Token);
 
             foreach (var result in results)
             {
@@ -614,8 +621,11 @@ public sealed partial class MainWindow : Window
         finally
         {
             _running = false;
-            StartButtonText.Text = "开始翻译";
-            StartIcon.Glyph = "\uE768";
+            _paused = false;
+            _pauseGate = null;
+            StartButton.IsEnabled = true;
+            PauseButton.Visibility = Visibility.Collapsed;
+            CancelButton.Visibility = Visibility.Collapsed;
             JobProgressBar.IsIndeterminate = false;
             ClearCueProgress();
             _currentFileName = "";
@@ -624,6 +634,40 @@ public sealed partial class MainWindow : Window
             _cts?.Dispose();
             _cts = null;
         }
+    }
+
+    /// <summary>暂停只在波次之间生效：已发出的请求会跑完，继续后从下一波接着处理。</summary>
+    private void OnPause(object sender, RoutedEventArgs e)
+    {
+        if (!_running || _pauseGate is null) return;
+
+        if (_paused)
+        {
+            _paused = false;
+            _pauseGate.Resume();
+            PauseButtonText.Text = "暂停";
+            PauseIcon.Glyph = "\uE769";
+            StatusLabel.Text = "继续处理…";
+        }
+        else
+        {
+            _paused = true;
+            _pauseGate.Pause();
+            PauseButtonText.Text = "继续";
+            PauseIcon.Glyph = "\uE768";
+            StatusLabel.Text = "已暂停";
+        }
+    }
+
+    private void OnCancel(object sender, RoutedEventArgs e)
+    {
+        if (!_running) return;
+
+        StatusLabel.Text = "正在取消…";
+        _paused = false;
+        _cts?.Cancel();
+        // 取消时把暂停中的等待一起唤醒，让任务走到取消分支。
+        _pauseGate?.Resume();
     }
 
     /// <summary>显示当前文件的翻译 / 润色段级进度，对应 legacy 的 tqdm。</summary>
@@ -965,11 +1009,7 @@ public sealed partial class MainWindow : Window
         {
             // 让窗口先画出来，别和启动动画抢时间。
             await Task.Delay(TimeSpan.FromSeconds(3));
-            var checker = new UpdateChecker
-            {
-                CurrentVersion = GetVersion(),
-                PreferredExtensions = new[] { ".exe" },
-            };
+            var checker = NewUpdateChecker();
             var info = await checker.CheckAsync();
             if (info is not null) ShowUpdateBar(info);
         }
@@ -1000,13 +1040,18 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// 安装版拿安装包（.exe）以便静默升级；便携版拿 zip，只能手动替换。
+    /// </summary>
+    private UpdateChecker NewUpdateChecker() => new()
+    {
+        CurrentVersion = GetVersion(),
+        PreferredExtensions = UpdateInstaller.IsInstalled ? new[] { ".exe" } : new[] { ".zip" },
+    };
+
     private async void OnCheckUpdates(object sender, RoutedEventArgs e)
     {
-        var checker = new UpdateChecker
-        {
-            CurrentVersion = GetVersion(),
-            PreferredExtensions = new[] { ".exe" },
-        };
+        var checker = NewUpdateChecker();
         try
         {
             var info = await checker.CheckAsync();
@@ -1016,20 +1061,33 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
+            var canSelfInstall = UpdateInstaller.CanSelfInstall(info);
+            var content = new StackPanel { Spacing = 8 };
+            if (canSelfInstall)
+            {
+                content.Children.Add(new TextBlock
+                {
+                    Text = "下载完成后会自动启动安装程序：AITrans 会关闭，装完自动重新打开；正在运行的任务会中断。",
+                    TextWrapping = TextWrapping.Wrap,
+                    Foreground = UiBrush.Get("TextFillColorSecondaryBrush", Microsoft.UI.Colors.Gray),
+                });
+            }
+            content.Children.Add(new ScrollViewer
+            {
+                MaxHeight = 280,
+                Content = new TextBlock
+                {
+                    Text = string.IsNullOrWhiteSpace(info.Notes) ? "该版本没有填写更新说明。" : info.Notes,
+                    TextWrapping = TextWrapping.Wrap,
+                },
+            });
+
             var dialog = new ContentDialog
             {
                 XamlRoot = Root.XamlRoot,
                 Title = $"发现新版本 {info.Version}",
-                Content = new ScrollViewer
-                {
-                    MaxHeight = 320,
-                    Content = new TextBlock
-                    {
-                        Text = string.IsNullOrWhiteSpace(info.Notes) ? "该版本没有填写更新说明。" : info.Notes,
-                        TextWrapping = TextWrapping.Wrap,
-                    },
-                },
-                PrimaryButtonText = "下载更新",
+                Content = content,
+                PrimaryButtonText = canSelfInstall ? "下载并安装" : "下载更新",
                 SecondaryButtonText = "打开下载页",
                 CloseButtonText = "稍后",
                 DefaultButton = ContentDialogButton.Primary,
@@ -1042,6 +1100,13 @@ public sealed partial class MainWindow : Window
                 {
                     StatusLabel.Text = "正在下载更新…";
                     var path = await UpdateDownloader.DownloadAsync(info);
+                    if (canSelfInstall)
+                    {
+                        UpdateInstaller.Run(path);
+                        StatusLabel.Text = "正在安装更新，AITrans 会自动重启…";
+                        return;
+                    }
+
                     StatusLabel.Text = "更新已下载";
                     Process.Start(new ProcessStartInfo
                     {
