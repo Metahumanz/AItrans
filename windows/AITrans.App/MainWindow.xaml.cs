@@ -167,6 +167,7 @@ public sealed partial class MainWindow : Window
         RetriesBox.Value = settings.Backend == Engine.ollama ? settings.OllamaRetries : settings.ApiRetries;
         CustomDirPanel.Visibility = settings.OutputMode == OutputMode.custom ? Visibility.Visible : Visibility.Collapsed;
         AutoCheckToggle.IsOn = settings.AutoCheckUpdates;
+        DownloadDirBox.Text = settings.DownloadDir;
     }
 
     private void SaveSettings()
@@ -187,6 +188,7 @@ public sealed partial class MainWindow : Window
         settings.Suffix = SuffixBox.Text;
         settings.CustomDir = CustomDirBox.Text;
         settings.AutoCheckUpdates = AutoCheckToggle.IsOn;
+        settings.DownloadDir = DownloadDirBox.Text.Trim();
         var workers = double.IsNaN(WorkersBox.Value) ? 20 : (int)WorkersBox.Value;
         var retries = double.IsNaN(RetriesBox.Value) ? 2 : (int)RetriesBox.Value;
         if (settings.Backend == Engine.ollama)
@@ -453,6 +455,19 @@ public sealed partial class MainWindow : Window
         picker.FileTypeFilter.Add("*");
         var folder = await picker.PickSingleFolderAsync();
         if (folder is not null) CustomDirBox.Text = folder.Path;
+    }
+
+    private async void OnChooseDownloadDir(object sender, RoutedEventArgs e)
+    {
+        var picker = new FolderPicker();
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+        picker.FileTypeFilter.Add("*");
+        var folder = await picker.PickSingleFolderAsync();
+        if (folder is not null)
+        {
+            DownloadDirBox.Text = folder.Path;
+            SaveSettings();
+        }
     }
 
     // ---------------------------------------------------------------- 任务
@@ -1051,6 +1066,7 @@ public sealed partial class MainWindow : Window
 
     private async void OnCheckUpdates(object sender, RoutedEventArgs e)
     {
+        SaveSettings();
         var checker = NewUpdateChecker();
         try
         {
@@ -1099,7 +1115,9 @@ public sealed partial class MainWindow : Window
                 try
                 {
                     StatusLabel.Text = "正在下载更新…";
-                    var path = await UpdateDownloader.DownloadAsync(info);
+                    var downloadDir = _settingsStore.Settings.DownloadDir;
+                    var path = await UpdateDownloader.DownloadAsync(
+                        info, string.IsNullOrEmpty(downloadDir) ? null : downloadDir);
                     if (canSelfInstall)
                     {
                         UpdateInstaller.Run(path);

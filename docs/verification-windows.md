@@ -71,6 +71,7 @@ powershell -ExecutionPolicy Bypass -File windows\scripts\verify.ps1 -Publish
 | 删除失败保留提供商 | `ProviderStoreTests.DeleteKeepsProviderWhenSecretDeletionFails` | |
 | 旧配置导入 | `ProviderStoreTests.ImportsLegacyEnvFile` | `.env` 与 `providers.json` |
 | 设置取值收敛 | `SettingsStoreTests.SanitizesOutOfRangeValues` | 并发/重试/后缀 |
+| 更新下载目录 | `SettingsStoreTests.DownloadDirectoryDefaultsEmptyAndRoundTrips` | 留空回落系统下载目录 |
 | 版本比较 | `UpdateCheckerTests.ComparesVersions` | 语义化版本 |
 
 ### 期望输出
@@ -130,6 +131,8 @@ Passed!  - Failed:     0, Passed:    50+, Skipped:     0, Total:    50+
 - [ ] 启动阶段不读 `secrets.dat`；开始任务 / 测试连接 / 打开编辑对话框时才读取
 - [ ] 手动改坏 `secrets.dat` 后启动，会弹出带路径的可读错误，而不是静默丢 Key
 - [ ] 「检查更新」能读到 GitHub 最新 release
+- [ ] 「关于 → 维护」里「更新下载目录」可选择目录并保存；更新包下载到该目录
+- [ ] 下载目录留空时回落到系统「下载」文件夹
 - [ ] 安装版「下载并安装」：下载安装包后自动启动，AITrans 关闭并在安装完成后自动重启，版本号更新
 - [ ] 便携版仍下载 zip 并定位到文件，按提示解压覆盖
 - [ ] 启动约 3 秒后自动检查一次；有新版本时任务页顶部出现提示条（不弹窗），「查看更新」能打开下载页

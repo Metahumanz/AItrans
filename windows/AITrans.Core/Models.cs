@@ -110,6 +110,8 @@ public sealed class AppSettings
     [JsonPropertyName("ollama_workers")] public int OllamaWorkers { get; set; } = 2;
     [JsonPropertyName("ollama_retries")] public int OllamaRetries { get; set; } = 1;
     [JsonPropertyName("auto_check_updates")] public bool AutoCheckUpdates { get; set; } = true;
+    /// <summary>更新包下载目录；留空则用系统「下载」文件夹。</summary>
+    [JsonPropertyName("download_dir")] public string DownloadDir { get; set; } = "";
 
     public AppSettings Clone() => (AppSettings)MemberwiseClone();
 
@@ -124,6 +126,9 @@ public sealed class AppSettings
         copy.OllamaRetries = Math.Clamp(copy.OllamaRetries, 0, 5);
         if (string.IsNullOrWhiteSpace(copy.Suffix)) copy.Suffix = "_translated";
         if (string.IsNullOrWhiteSpace(copy.OllamaModel)) copy.OllamaModel = "qwen2.5";
+        copy.DownloadDir = string.IsNullOrWhiteSpace(copy.DownloadDir)
+            ? ""
+            : copy.DownloadDir.Trim().Trim('"');
         return copy;
     }
 }

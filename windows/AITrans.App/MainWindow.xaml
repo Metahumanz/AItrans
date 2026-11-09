@@ -717,6 +717,21 @@
                                             <TextBlock Text="检查更新…" />
                                         </StackPanel>
                                     </Button>
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox
+                                            x:Name="DownloadDirBox"
+                                            Header="更新下载目录"
+                                            PlaceholderText="留空则使用系统「下载」文件夹" />
+                                        <Button
+                                            Grid.Column="1"
+                                            VerticalAlignment="Bottom"
+                                            Click="OnChooseDownloadDir"
+                                            Content="选择…" />
+                                    </Grid>
                                     <Button
                                         Click="OnOpenDataFolder"
                                         HorizontalAlignment="Stretch">

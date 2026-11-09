@@ -385,6 +385,29 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public void DownloadDirectoryDefaultsEmptyAndRoundTrips()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "aitrans-settings-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var store = new SettingsStore();
+            Assert.Equal("", store.Settings.DownloadDir);
+
+            store.Update(settings => settings.DownloadDir = @"  D:\Updates  ");
+            store.Save(path);
+            Assert.Contains("\"download_dir\"", File.ReadAllText(path));
+
+            var reloaded = new SettingsStore();
+            reloaded.Load(path);
+            Assert.Equal(@"D:\Updates", reloaded.Settings.DownloadDir);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void MissingAutoCheckKeyKeepsDefault()
     {
         var path = Path.Combine(Path.GetTempPath(), "aitrans-settings-" + Guid.NewGuid().ToString("N") + ".json");

@@ -70,7 +70,7 @@ ISCC.exe /DMyAppVersion=0.3.6 windows\installer\AITrans.iss
 - 提供商地址：macOS 上公网接口必须用 `https://`；`localhost`、回环与私有网段（含 Ollama 默认的 `http://localhost:11434`）可继续用 `http://`，打包脚本已在 `Info.plist` 声明对应的 ATS 例外（Windows 不受影响）；
 - 密钥保存在本地：macOS 用 `secrets.json`（**明文**，0600，不使用钥匙串），Windows 用 DPAPI 加密的 `secrets.dat`；`providers.json` 中不写明文；
 - macOS 从 v0.3.1 及更早版本升级到 v0.3.2+ 时，旧钥匙串里的 Key 不会自动迁移，需要在「提供商」里重新填写一次（只需一次）。
-- 应用内检查更新：启动后静默查一次（可关），发现新版本在界面顶部提示；Windows 安装版可直接「下载并安装」并自动重启，macOS 与便携版下载到「下载」文件夹后按提示替换。
+- 应用内检查更新：启动后静默查一次（可关），发现新版本在界面顶部提示；Windows 可自定义更新下载目录，安装版可直接「下载并安装」并自动重启，macOS 与 Windows 便携版下载后按提示替换。
 
 ### 开发约定
 
