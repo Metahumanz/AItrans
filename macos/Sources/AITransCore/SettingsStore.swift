@@ -56,6 +56,10 @@ public final class SettingsStore: @unchecked Sendable {
         if result.ollamaModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             result.ollamaModel = "qwen2.5"
         }
+        result.downloadDir = result.downloadDir
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         return result
     }
 }

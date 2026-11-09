@@ -141,6 +141,8 @@ public struct AppSettings: Sendable, Equatable, Codable {
     public var ollamaWorkers: Int = 2
     public var ollamaRetries: Int = 1
     public var autoCheckUpdates: Bool = true
+    /// 更新包下载目录；留空则用系统「下载」文件夹。
+    public var downloadDir: String = ""
 
     public init() {}
 
@@ -164,6 +166,7 @@ public struct AppSettings: Sendable, Equatable, Codable {
         ollamaWorkers = try container.decodeIfPresent(Int.self, forKey: .ollamaWorkers) ?? 2
         ollamaRetries = try container.decodeIfPresent(Int.self, forKey: .ollamaRetries) ?? 1
         autoCheckUpdates = try container.decodeIfPresent(Bool.self, forKey: .autoCheckUpdates) ?? true
+        downloadDir = try container.decodeIfPresent(String.self, forKey: .downloadDir) ?? ""
     }
 
     enum CodingKeys: String, CodingKey {
@@ -177,6 +180,7 @@ public struct AppSettings: Sendable, Equatable, Codable {
         case apiRetries = "api_retries"
         case ollamaWorkers = "ollama_workers"
         case ollamaRetries = "ollama_retries"
+        case downloadDir = "download_dir"
     }
 }
 

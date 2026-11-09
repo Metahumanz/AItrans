@@ -438,6 +438,48 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(reloaded.settings.autoCheckUpdates)
     }
 
+    func testDownloadDirDefaultsEmptyAndRoundTrips() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "aitrans-download-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let path = dir.appending(path: "settings.json")
+        let store = SettingsStore()
+        XCTAssertEqual(store.settings.downloadDir, "")
+
+        store.update { $0.downloadDir = "  /tmp/aitrans-updates  " }
+        try store.save(to: path)
+        let json = try String(contentsOf: path, encoding: .utf8)
+        XCTAssertTrue(json.contains("\"download_dir\""))
+
+        let reloaded = SettingsStore()
+        try reloaded.load(from: path)
+        XCTAssertEqual(reloaded.settings.downloadDir, "/tmp/aitrans-updates")
+    }
+
+    func testApiAndOllamaConcurrencyRoundTripIndependently() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "aitrans-workers-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let path = dir.appending(path: "settings.json")
+        let store = SettingsStore()
+        store.update { settings in
+            settings.apiWorkers = 12
+            settings.apiRetries = 3
+            settings.ollamaWorkers = 3
+            settings.ollamaRetries = 0
+        }
+        try store.save(to: path)
+
+        let reloaded = SettingsStore()
+        try reloaded.load(from: path)
+        XCTAssertEqual(reloaded.settings.apiWorkers, 12)
+        XCTAssertEqual(reloaded.settings.apiRetries, 3)
+        XCTAssertEqual(reloaded.settings.ollamaWorkers, 3)
+        XCTAssertEqual(reloaded.settings.ollamaRetries, 0)
+    }
+
     func testMissingAutoCheckKeyKeepsDefault() throws {
         // 老版本写下的配置里没有 auto_check_updates：不能整份解码失败，也不能丢掉其它字段。
         let dir = FileManager.default.temporaryDirectory.appending(path: "aitrans-legacy-\(UUID().uuidString)")
@@ -456,6 +498,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(store.settings.autoCheckUpdates)
         XCTAssertTrue(store.settings.translate)
         XCTAssertEqual(store.settings.suffix, "_translated")
+        XCTAssertEqual(store.settings.downloadDir, "")
     }
 }
 

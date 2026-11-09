@@ -137,6 +137,7 @@ struct ContentView: View {
                         }
                     }
                     .onDelete { state.removeFiles(at: $0) }
+                    .deleteDisabled(state.isRunning)
                 }
                 .listStyle(.inset)
             }
@@ -356,18 +357,37 @@ struct ContentView: View {
             }
 
             Section("并发与重试") {
-                NumberRow(title: "并发", value: $state.settings.apiWorkers, range: 1...64)
-                NumberRow(title: "重试", value: $state.settings.apiRetries, range: 0...5)
-                Text("可直接输入，也可以点右侧箭头微调。")
+                NumberRow(title: "并发", value: workersBinding, range: 1...64)
+                NumberRow(title: "重试", value: retriesBinding, range: 0...5)
+                Text(state.settings.backend == .api
+                     ? "当前保存的是 API 引擎的并发与重试。"
+                     : "当前保存的是本地 Ollama 的并发与重试。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("可直接输入，也可以点右侧箭头微调；切换引擎后分别保存。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Section("关于") {
-                LabeledContent("版本", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
+            Section("更新") {
                 Toggle("启动时自动检查更新", isOn: $state.settings.autoCheckUpdates)
+                HStack {
+                    TextField(
+                        "下载目录",
+                        text: $state.settings.downloadDir,
+                        prompt: Text("留空使用系统「下载」")
+                    )
+                    Button("选择…") { chooseDownloadDirectory() }
+                }
+                Text("更新包会下载到这个目录；留空时使用系统「下载」文件夹。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Button("检查更新…") { state.checkForUpdates() }
                     .disabled(state.isCheckingUpdate)
+            }
+
+            Section("关于") {
+                LabeledContent("版本", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
                 Button("管理提供商…") { showProviders = true }
             }
         }
@@ -385,6 +405,18 @@ struct ContentView: View {
             : $state.settings.ollamaModel
     }
 
+    private var workersBinding: Binding<Int> {
+        state.settings.backend == .api
+            ? $state.settings.apiWorkers
+            : $state.settings.ollamaWorkers
+    }
+
+    private var retriesBinding: Binding<Int> {
+        state.settings.backend == .api
+            ? $state.settings.apiRetries
+            : $state.settings.ollamaRetries
+    }
+
     private var modelPrompt: String {
         state.settings.backend == .api
             ? (state.activeProvider?.model ?? "deepseek-flash")
@@ -398,6 +430,17 @@ struct ContentView: View {
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
             state.settings.customDir = url.path
+        }
+    }
+
+    private func chooseDownloadDirectory() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "选择"
+        if panel.runModal() == .OK, let url = panel.url {
+            state.settings.downloadDir = url.path
         }
     }
 }

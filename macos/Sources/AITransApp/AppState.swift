@@ -144,6 +144,7 @@ final class AppState: ObservableObject {
     }
 
     func removeFiles(at offsets: IndexSet) {
+        guard !isRunning else { return }
         files.remove(atOffsets: offsets)
     }
 
@@ -496,14 +497,20 @@ final class AppState: ObservableObject {
     func downloadUpdate(_ info: UpdateInfo) {
         guard !isDownloadingUpdate else { return }
         isDownloadingUpdate = true
+        let trimmed = settings.downloadDir.trimmingCharacters(in: .whitespacesAndNewlines)
+        let expanded = (trimmed as NSString).expandingTildeInPath
+        let directory = trimmed.isEmpty ? nil : URL(filePath: expanded)
         Task {
             defer { isDownloadingUpdate = false }
             do {
-                let url = try await UpdateDownloader.download(info)
+                let url = try await UpdateDownloader.download(
+                    info,
+                    into: directory ?? UpdateDownloader.downloadsDirectory
+                )
                 await MainActor.run {
                     self.downloadedUpdate = url
                     NSWorkspace.shared.activateFileViewerSelecting([url])
-                    self.alertMessage = UpdateDownloader.installHint
+                    self.alertMessage = UpdateDownloader.installHint(for: url)
                 }
             } catch {
                 await MainActor.run { self.alertMessage = error.localizedDescription }

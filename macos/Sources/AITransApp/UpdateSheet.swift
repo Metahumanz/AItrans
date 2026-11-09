@@ -44,7 +44,7 @@ struct UpdateSheet: View {
                 Label("已下载：\(downloaded.lastPathComponent)", systemImage: "checkmark.circle.fill")
                     .font(.callout)
                     .foregroundStyle(.green)
-                Text(UpdateDownloader.installHint)
+                Text(UpdateDownloader.installHint(for: downloaded))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

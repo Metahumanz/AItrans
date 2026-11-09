@@ -194,6 +194,38 @@ final class JobRunnerTests: XCTestCase {
         XCTAssertEqual(results.first?.status, .success)
     }
 
+    func testCancelWakesPausedJob() async throws {
+        let file = try copyFixture("basic-utf8.srt", to: workDir)
+        var settings = AppSettings()
+        settings.outputMode = .source
+        settings.polish = false
+
+        let gate = PauseGate()
+        gate.pause()
+        let task = Task {
+            try await makeRunner().run(
+                files: [file],
+                settings: settings,
+                outputDirectory: workDir,
+                customDirectory: nil,
+                pauseGate: gate
+            )
+        }
+
+        try await Task.sleep(for: .milliseconds(100))
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("暂停中的任务应当被取消")
+        } catch is CancellationError {
+            // 预期路径。
+        }
+
+        let output = workDir.appending(path: "basic-utf8_translated.srt")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: output.path), "取消后不应留下半截输出")
+    }
+
     func testOllamaBackendRunsWithSamePipeline() async throws {
         let file = try copyFixture("basic-utf8.srt", to: workDir)
         var settings = AppSettings()

@@ -31,8 +31,12 @@ public enum UpdateDownloader {
         return destination
     }
 
-    /// 替换步骤，展示给用户。
-    public static var installHint: String {
-        "已下载到「下载」文件夹。退出 AITrans，解压后把 AITrans.app 拖到「应用程序」覆盖旧版本即可。"
+    /// 替换步骤，展示给用户；按实际下载到的文件类型区分 dmg 与 zip。
+    public static func installHint(for file: URL) -> String {
+        let directory = file.deletingLastPathComponent().path
+        if file.pathExtension.lowercased() == "dmg" {
+            return "已下载到「\(directory)」。退出 AITrans，打开 dmg，把 AITrans.app 拖到「应用程序」覆盖旧版本即可。"
+        }
+        return "已下载到「\(directory)」。退出 AITrans，解压后把 AITrans.app 拖到「应用程序」覆盖旧版本即可。"
     }
 }
