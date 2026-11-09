@@ -165,6 +165,35 @@ final class JobRunnerTests: XCTestCase {
         XCTAssertEqual(cues.last?.errorCount, 0)
     }
 
+    func testPauseGateStopsBeforeStartingFiles() async throws {
+        let file = try copyFixture("basic-utf8.srt", to: workDir)
+        var settings = AppSettings()
+        settings.outputMode = .source
+        settings.polish = false
+        settings.force = true
+
+        let gate = PauseGate()
+        gate.pause()
+        let fileRecorder = ProgressRecorder<JobProgress>()
+        let task = Task {
+            try await makeRunner().run(
+                files: [file],
+                settings: settings,
+                outputDirectory: workDir,
+                customDirectory: nil,
+                pauseGate: gate,
+                onFileProgress: { fileRecorder.append($0) }
+            )
+        }
+
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertTrue(fileRecorder.values.isEmpty, "暂停时不应开始处理文件")
+
+        gate.resume()
+        let results = try await task.value
+        XCTAssertEqual(results.first?.status, .success)
+    }
+
     func testOllamaBackendRunsWithSamePipeline() async throws {
         let file = try copyFixture("basic-utf8.srt", to: workDir)
         var settings = AppSettings()

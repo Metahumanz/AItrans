@@ -105,22 +105,6 @@ struct ContentView: View {
             } label: {
                 Label(state.activeProvider?.name ?? "选择提供商", systemImage: "cpu")
             }
-
-            if state.isRunning {
-                Button(role: .destructive) {
-                    state.cancel()
-                } label: {
-                    Label("取消", systemImage: "stop.fill")
-                }
-            } else {
-                Button {
-                    state.start()
-                } label: {
-                    Label("开始", systemImage: "play.fill")
-                }
-                .disabled(state.files.isEmpty)
-                .keyboardShortcut(.return, modifiers: .command)
-            }
         }
     }
 
@@ -214,7 +198,7 @@ struct ContentView: View {
                 .foregroundStyle(.tertiary)
             Text("把 .srt 文件或文件夹拖到这里")
                 .font(.title3)
-            Text("也可以点左上角「添加文件」")
+            Text("也可以点左上角「添加文件」，再点左下角「开始」")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
@@ -222,6 +206,63 @@ struct ContentView: View {
     }
 
     private var footer: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            progressRows
+
+            // 主操作固定在左下角：开始 / 暂停（继续）/ 取消。
+            HStack(spacing: 8) {
+                Button {
+                    state.start()
+                } label: {
+                    Label("开始", systemImage: "play.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(state.isRunning || state.files.isEmpty)
+                .keyboardShortcut(.return, modifiers: .command)
+                .help("开始翻译（⌘↩）")
+
+                if state.isRunning {
+                    Button {
+                        if state.isPaused {
+                            state.resume()
+                        } else {
+                            state.pause()
+                        }
+                    } label: {
+                        Label(
+                            state.isPaused ? "继续" : "暂停",
+                            systemImage: state.isPaused ? "play.fill" : "pause.fill"
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .help(state.isPaused ? "继续任务" : "暂停（当前批次完成后停止）")
+
+                    Button(role: .destructive) {
+                        state.cancel()
+                    } label: {
+                        Label("取消", systemImage: "stop.fill")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .help("取消任务")
+                }
+
+                Spacer()
+
+                if !state.files.isEmpty {
+                    Button("清空") { state.clearFiles() }
+                        .buttonStyle(.link)
+                        .disabled(state.isRunning)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
+    private var progressRows: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Text("文件")
@@ -236,11 +277,6 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Spacer()
-                if !state.files.isEmpty {
-                    Button("清空") { state.clearFiles() }
-                        .buttonStyle(.link)
-                        .disabled(state.isRunning)
-                }
             }
 
             // 对应 legacy 的 tqdm：翻译和润色各自按段推进，并显示成功/失败计数。
@@ -262,8 +298,6 @@ struct ContentView: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
     }
 
     // MARK: - 设置列

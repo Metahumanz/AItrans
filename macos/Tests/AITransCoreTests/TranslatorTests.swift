@@ -139,6 +139,31 @@ final class TranslatorTests: XCTestCase {
         )
     }
 
+    func testTranslateHonorsPauseGateBeforeFirstWave() async throws {
+        let blocks = try loadBlocks("basic-utf8.srt")
+        let gate = PauseGate()
+        gate.pause()
+        let recorder = ProgressRecorder<CueProgress>()
+
+        let task = Task {
+            try await Translator(client: FakeChatClient()).translate(
+                blocks: blocks,
+                language: .zh,
+                workers: 1,
+                pauseGate: gate,
+                onProgress: { recorder.append($0) }
+            )
+        }
+
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertTrue(recorder.values.isEmpty, "暂停时不应开始翻译")
+
+        gate.resume()
+        let outcome = try await task.value
+        XCTAssertEqual(outcome.successCount, 3)
+        XCTAssertEqual(recorder.values.last?.completed, 3)
+    }
+
     func testTranslateFailureKeepsOriginal() async throws {
         struct FailingClient: ChatCompleting {
             func complete(messages: [ChatMessage]) async throws -> String {

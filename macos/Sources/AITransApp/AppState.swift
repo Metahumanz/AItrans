@@ -11,6 +11,7 @@ final class AppState: ObservableObject {
     @Published var files: [URL] = []
     @Published var results: [String: FileResult] = [:]
     @Published var isRunning = false
+    @Published var isPaused = false
     @Published var progress: Double = 0
     @Published var statusText = "拖入 .srt 文件或文件夹开始"
     /// 当前正在处理的文件名与段级进度，用来显示 legacy 风格的翻译/润色进度条。
@@ -30,6 +31,7 @@ final class AppState: ObservableObject {
     let settingsStore: SettingsStore
     let providerStore: ProviderStore
     private var task: Task<Void, Never>?
+    private var pauseGate: PauseGate?
 
     init(
         settingsStore: SettingsStore = SettingsStore(),
@@ -152,6 +154,8 @@ final class AppState: ObservableObject {
         progress = 0
         currentFileName = ""
         activeCueProgress = nil
+        isPaused = false
+        pauseGate = nil
         statusText = "拖入 .srt 文件或文件夹开始"
     }
 
@@ -212,6 +216,9 @@ final class AppState: ObservableObject {
         let pending = files
         let customDirectory = settings.customDir.isEmpty ? nil : URL(filePath: settings.customDir)
 
+        let gate = PauseGate()
+        pauseGate = gate
+        isPaused = false
         isRunning = true
         progress = 0
         results.removeAll()
@@ -232,6 +239,7 @@ final class AppState: ObservableObject {
                     settings: currentSettings,
                     outputDirectory: AppPaths.defaultOutputDirectory,
                     customDirectory: customDirectory,
+                    pauseGate: gate,
                     onFileProgress: { update in
                         Task { @MainActor in
                             self.progress = update.total == 0 ? 0 : Double(update.completed) / Double(update.total)
@@ -241,6 +249,7 @@ final class AppState: ObservableObject {
                             if self.activeCueProgress?.fileName != update.currentName {
                                 self.activeCueProgress = nil
                             }
+                            guard !self.isPaused else { return }
                             if update.currentName.isEmpty {
                                 self.statusText = "完成"
                             } else if let cue = self.activeCueProgress, cue.fileName == update.currentName {
@@ -258,7 +267,7 @@ final class AppState: ObservableObject {
                             if !update.fileName.isEmpty {
                                 self.currentFileName = update.fileName
                             }
-                            guard !self.currentFileName.isEmpty else { return }
+                            guard !self.isPaused, !self.currentFileName.isEmpty else { return }
                             self.statusText = update.stage == .translating
                                 ? "正在翻译 \(self.currentFileName)"
                                 : "正在润色 \(self.currentFileName)"
@@ -271,6 +280,8 @@ final class AppState: ObservableObject {
                     }
                     self.progress = 1
                     self.isRunning = false
+                    self.isPaused = false
+                    self.pauseGate = nil
                     self.currentFileName = ""
                     self.activeCueProgress = nil
                     let ok = output.filter { $0.status == .success }.count
@@ -284,6 +295,8 @@ final class AppState: ObservableObject {
             } catch is CancellationError {
                 await MainActor.run {
                     self.isRunning = false
+                    self.isPaused = false
+                    self.pauseGate = nil
                     self.currentFileName = ""
                     self.activeCueProgress = nil
                     self.statusText = "已取消"
@@ -291,6 +304,8 @@ final class AppState: ObservableObject {
             } catch {
                 await MainActor.run {
                     self.isRunning = false
+                    self.isPaused = false
+                    self.pauseGate = nil
                     self.currentFileName = ""
                     self.activeCueProgress = nil
                     self.statusText = "已停止"
@@ -300,9 +315,29 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// 暂停只在波次之间生效：已经发出的请求会跑完，再停在下一波开始前。
+    func pause() {
+        guard isRunning, !isPaused else { return }
+        isPaused = true
+        pauseGate?.pause()
+        statusText = "已暂停"
+    }
+
+    func resume() {
+        guard isRunning, isPaused else { return }
+        isPaused = false
+        pauseGate?.resume()
+        statusText = "继续处理…"
+    }
+
     func cancel() {
+        guard isRunning else { return }
         task?.cancel()
+        // 取消时把暂停中的等待一起唤醒，让任务走到取消分支。
+        pauseGate?.resume()
         task = nil
+        isPaused = false
+        statusText = "正在取消…"
     }
 
     // MARK: - 提供商

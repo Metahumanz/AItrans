@@ -40,6 +40,7 @@ public struct Translator: Sendable {
         blocks: [SRTBlock],
         language: Language,
         workers: Int = Spec.defaultTranslateWorkers,
+        pauseGate: PauseGate? = nil,
         onProgress: (@Sendable (CueProgress) -> Void)? = nil
     ) async throws -> TranslateOutcome {
         let indices = blocks.indices.filter { blocks[$0].isValid }
@@ -49,6 +50,8 @@ public struct Translator: Sendable {
         let width = max(1, workers)
         var finished = 0
         var success = 0
+
+        try await pauseGate?.waitIfPaused()
 
         // 与 legacy 的 tqdm 一致：任务一开始就显示 0/N，而不是等第一批完成才出现。
         onProgress?(CueProgress(
@@ -60,6 +63,7 @@ public struct Translator: Sendable {
         ))
 
         for start in stride(from: 0, to: indices.count, by: width) {
+            try await pauseGate?.waitIfPaused()
             if Task.isCancelled { throw CancellationError() }
             let wave = Array(indices[start..<min(start + width, indices.count)])
 
@@ -117,6 +121,7 @@ public struct Translator: Sendable {
         translations: [String?],
         batchSize: Int = Spec.defaultPolishBatchSize,
         workers: Int = Spec.defaultPolishWorkers,
+        pauseGate: PauseGate? = nil,
         onProgress: (@Sendable (CueProgress) -> Void)? = nil
     ) async throws -> PolishOutcome {
         var working = translations
@@ -134,6 +139,8 @@ public struct Translator: Sendable {
         var errors = 0
         var finishedCues = 0
 
+        try await pauseGate?.waitIfPaused()
+
         onProgress?(CueProgress(
             stage: .polishing,
             completed: 0,
@@ -143,6 +150,7 @@ public struct Translator: Sendable {
         ))
 
         for start in stride(from: 0, to: batches.count, by: width) {
+            try await pauseGate?.waitIfPaused()
             if Task.isCancelled { throw CancellationError() }
             let wave = Array(start..<min(start + width, batches.count))
 

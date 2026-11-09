@@ -42,6 +42,7 @@ app/ web/ legacy/     v1 Python 实现，保留作 CLI 与迁移参考
 | `RetryPolicy.swift` | 可重试判定、指数退避 | 纯函数 |
 | `ChatClient.swift` | OpenAI 兼容请求 | 依赖网络，测 payload 构造 |
 | `Translator.swift` | 并发翻译、分批润色 | 依赖 ChatClient 抽象 |
+| `PauseGate.swift` | 暂停 / 继续与取消唤醒 | 纯逻辑，可单测 |
 | `AITransApp` | SwiftUI 界面 | 手工验证 |
 
 Windows 端保持一一对应的模块划分（`AITrans.Core` / `AITrans.App`），便于逐项对照。

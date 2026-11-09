@@ -26,6 +26,7 @@ public struct JobRunner: Sendable {
         settings: AppSettings,
         outputDirectory: URL,
         customDirectory: URL?,
+        pauseGate: PauseGate? = nil,
         onFileProgress: (@Sendable (JobProgress) -> Void)? = nil,
         onCueProgress: (@Sendable (CueProgress) -> Void)? = nil
     ) async throws -> [FileResult] {
@@ -43,6 +44,7 @@ public struct JobRunner: Sendable {
 
         var results: [FileResult] = []
         for (offset, pair) in pairs.enumerated() {
+            try await pauseGate?.waitIfPaused()
             if Task.isCancelled { throw CancellationError() }
             onFileProgress?(JobProgress(
                 completed: offset,
@@ -85,6 +87,7 @@ public struct JobRunner: Sendable {
                     blocks: blocks,
                     language: settings.lang,
                     workers: workers,
+                    pauseGate: pauseGate,
                     onProgress: reportCueProgress
                 )
 
@@ -97,6 +100,7 @@ public struct JobRunner: Sendable {
                         translations: translations,
                         batchSize: Spec.defaultPolishBatchSize,
                         workers: polishWorkers,
+                        pauseGate: pauseGate,
                         onProgress: reportCueProgress
                     )
                     translations = polished.translations
