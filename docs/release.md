@@ -1,11 +1,12 @@
 # 发布与更新
 
-> 状态：`v0.3.6` 为当前发布版本；完整发布流程（tag 推送 → 双端构建 → 创建 Release）已在 `v0.3.1`、`v0.3.2`、`v0.3.3`、`v0.3.4`、`v0.3.5` 和 `v0.3.6` 走通，产物可下载。
+> 状态：`v0.3.7` 为当前发布版本；完整发布流程（tag 推送 → 双端构建 → 创建 Release）已在 `v0.3.1`、`v0.3.2`、`v0.3.3`、`v0.3.4`、`v0.3.5`、`v0.3.6` 和 `v0.3.7` 走通，产物可下载。
 > `v0.3.2` 起 macOS 密钥保存在本地 `secrets.json`（**明文**，0600），不再使用钥匙串；`v0.3.1` 及以前为钥匙串实现。升级后旧钥匙串条目不自动迁移，需要在「提供商」里重新填写一次 API Key。
 > `v0.3.3` 起两端都按需读取密钥（启动不碰密钥文件），并支持在提供商面板里清除已保存的密钥；Windows 的 `secrets.dat` 损坏时会给出带路径的提示，不再静默当成「没有密钥」。
 > `v0.3.4` 起 macOS 删除提供商 / 清除密钥前需要确认；公网 `http://` 接口在保存时被拒绝并提示改用 https，本机/局域网 http 仍可用；应用显示名统一为 `AITrans`。
 > `v0.3.5` 起 macOS 打包 App 在 `Info.plist` 声明本机/局域网 ATS 例外，Ollama 默认地址改为 `http://localhost:11434`，覆盖 macOS 14+ 对 IP 字面量的默认限制。
 > `v0.3.6` 起两端在文件级进度之外，翻译 / 润色阶段按段显示进度、成功与失败计数，对应 legacy 的 tqdm。
+> `v0.3.7` 起两端支持暂停 / 继续，Windows 安装版可下载后自替换，两端都可自定义更新下载目录；macOS 的并发 / 重试按引擎分别保存。
 > 仓库已设为**公开**，应用内的匿名检查更新（`api.github.com/repos/Metahumanz/AItrans/releases/latest`）
 > 才能拿到数据；如果以后改回私有，检查更新会静默失效。
 
@@ -66,7 +67,7 @@ Release 正文由 `.github/actions/release-notes` 统一生成：首次打开说
 发布工作流里自动编译，本地也可以直接跑：
 
 ```sh
-ISCC.exe /DMyAppVersion=0.3.6 /DSourceDir=..\dist\app windows\installer\AITrans.iss
+ISCC.exe /DMyAppVersion=0.3.7 /DSourceDir=..\dist\app windows\installer\AITrans.iss
 ```
 
 - 默认装到 `%LocalAppData%\Programs\AITrans`，**不需要管理员权限**；
