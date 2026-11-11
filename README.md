@@ -110,4 +110,6 @@ AI_MODEL=deepseek-flash
 
 ## 许可
 
-个人项目，未声明开源许可。
+Copyright (C) 2026 Metahumanz
+
+本项目以 [GNU General Public License v3.0](LICENSE)（GPL-3.0）发布。
